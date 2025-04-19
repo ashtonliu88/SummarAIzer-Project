@@ -1,6 +1,5 @@
 import os
 import argparse
-import math
 from PyPDF2 import PdfReader
 from openai import OpenAI
 import tiktoken
