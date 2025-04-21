@@ -1,36 +1,40 @@
-import { User, Home } from "lucide-react";
-import React from "react";
 
-const navLinks = [
-  { name: "Home", href: "#" },
-  { name: "My Library", href: "#" },
-  { name: "Login", href: "#" },
-];
+import React from 'react';
+import { Link } from 'react-router-dom';
 
-const Navbar = () => (
-  <nav className="w-full bg-primary flex items-center justify-between px-8 py-3 shadow-sm font-nunito overflow-x-auto min-h-16">
-    <div className="flex items-center gap-2">
-      <span className="font-bold text-white text-xl tracking-tight">SummarAlze</span>
-    </div>
-    <div className="flex gap-1">
-      {navLinks.map((link, idx) => (
-        <a
-          key={link.name}
-          href={link.href}
-          className={`px-5 py-1.5 mx-1 rounded-full transition-colors text-base font-semibold ${
-            idx === 0 ? "bg-white text-primary" : "text-white hover:bg-white/10"
-          }`}
-        >
-          {link.name}
-        </a>
-      ))}
-    </div>
-    <div>
-      <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-primary font-bold text-lg border-2 border-primary">
-        <User size={20} />
+const Navbar = () => {
+  return (
+    <nav className="bg-[#2261CF] py-4 px-6 shadow-sm"> 
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <Link 
+          to="/" 
+          className="text-white text-2xl font-bold tracking-wider hover:opacity-80 transition-opacity"
+        > 
+          SummarAlze
+        </Link>
+        <div className="flex items-center space-x-6"> 
+          <Link 
+            to="/" 
+            className="text-white text-sm hover:underline hover:text-gray-200 transition-all"
+          >
+            Home
+          </Link>
+          <Link 
+            to="/library" 
+            className="text-white text-sm hover:underline hover:text-gray-200 transition-all"
+          >
+            My Library
+          </Link>
+          <Link 
+            to="/login" 
+            className="text-white text-sm hover:underline hover:text-gray-200 transition-all"
+          >
+            Login
+          </Link>
+        </div>
       </div>
-    </div>
-  </nav>
-);
+    </nav>
+  );
+};
 
 export default Navbar;
