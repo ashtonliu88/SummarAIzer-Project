@@ -1,11 +1,22 @@
-import React from 'react';
+import React, {useState} from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 
 const DifficultySelector = () => {
+
+  const [selected, setSelected] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Beginner')
+  const options: typeof selected[] = ['Beginner', 'Intermediate', 'Advanced']
+
+  const getButtonClasses = (option: typeof selected) => {
+    const base = 'rounded-full px-6 py-2 text-sm font-medium transition-all'
+    const active = 'bg-[#5B9BFF] text-white hover:bg-[#4A8AFF] shadow-md'
+    const inactive = 'text-gray-600 hover:bg-gray-100'
+    return `${base} ${selected === option ? active : inactive}`
+  }
+
   return (
     <div className="flex items-center gap-3 bg-white p-3 rounded-full shadow-sm border border-gray-100 mt-4"> {/* Added slight top margin */}
-      <Button 
+      {/* <Button 
         variant="ghost"
         className="bg-[#5B9BFF] text-white rounded-full px-6 py-2 text-sm font-medium hover:bg-[#4A8AFF] transition-all hover:shadow-md"
       >
@@ -22,7 +33,18 @@ const DifficultySelector = () => {
         className="text-gray-600 rounded-full px-6 py-2 text-sm font-medium hover:bg-gray-100 transition-all"
       >
         Advanced
-      </Button>
+      </Button> */}
+
+      {options.map((opt) => (
+        <Button
+          key={opt}
+          variant="ghost"
+          onClick={() => setSelected(opt)}
+          className={getButtonClasses(opt)}
+        >
+          {opt}
+        </Button>
+      ))}
       <Button 
         className="bg-[#2261CF] text-white rounded-full px-6 py-2 text-sm font-medium hover:bg-[#1B50B0] transition-all hover:shadow-md ml-auto"
       >
