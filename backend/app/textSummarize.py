@@ -74,7 +74,7 @@ class PdfSummarizer:
         
         return chunks
     
-    def summarize_chunk(self, chunk, is_first=False, is_last=False):
+    def summarize_chunk(self, chunk, is_first=False, is_last=False, detailed=False):
         if is_first and is_last:
             prompt = f"""
             Please summarize the following research paper. Cover the key findings, methodology, 
@@ -111,49 +111,85 @@ class PdfSummarizer:
             
         try:
             # Updated API call for OpenAI SDK 1.0.0+
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a research assistant that creates concise yet comprehensive summaries of academic papers."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=1500
-            )
-            return response.choices[0].message.content
+            if not detailed:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a research assistant that creates concise yet comprehensive summaries of academic papers."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=1500
+                )
+                return response.choices[0].message.content
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a research assistant that creates comprehensive summaries of academic papers with detailed breakdowns"
+                        "of each subtopic and concept within the research paper for complete beginners."},
+                        {"role": "user", "content": f"For any summary, extract keywords and give a long detailed explanation for every keyword for someone with no background knowledge. {prompt}"}
+                    ],
+                    temperature=0.3,
+                    max_tokens=5000
+                )
+                return response.choices[0].message.content
         except Exception as e:
             raise Exception(f"Error calling OpenAI API: {e}")
     
     #compile chunks
-    def compile_summary(self, chunk_summaries):
+    def compile_summary(self, chunk_summaries, detailed=False):
         if len(chunk_summaries) == 1:
             return chunk_summaries[0]
         
         combined_summary = "\n\n".join([f"Chunk {i+1} Summary:\n{summary}" for i, summary in enumerate(chunk_summaries)])
-        
-        prompt = f"""
-        Below are summaries of different parts of a research paper. Please synthesize these summaries
-        into a coherent, comprehensive summary of the entire paper. Eliminate redundancies and organize
-        the information logically. Focus on the research question, methodology, key findings, and conclusions.
-        
-        {combined_summary}
-        """
+
+        if not detailed:
+            prompt = f"""
+            Below are summaries of different parts of a research paper. Please synthesize these summaries
+            into a coherent, comprehensive summary of the entire paper. Eliminate redundancies and organize
+            the information logically. Focus on the research question, methodology, key findings, and conclusions.
+            
+            {combined_summary}
+            """
+        else:
+            prompt = f"""
+            Below are detailed summaries of different parts of a research paper with detailed explanation of concepts. Please synthesize these summaries
+            into a coherent summary of the entire paper and make sure to add extensive detail about every subtopic and concept. Eliminate redundancies and organize
+            the information logically. Focus on extracting key words and giving long detailed explanation about every single keyword. Do not include titles, 
+            make it flow like a very detailed human-written summary written for someone with no background knowledge on the topic.
+            
+            {combined_summary}
+            """
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a research assistant that creates cohesive summaries from partial summaries of academic papers."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=2000
-            )
-            return response.choices[0].message.content
+            if not detailed: 
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a research assistant that creates cohesive summaries from partial summaries of academic papers."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=2000
+                )
+                return response.choices[0].message.content
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a research assistant that creates creates cohesive summaries from partial summaries of academic papers"
+                        " with detailed breakdowns of each subtopic and concept within the research paper for complete beginners."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=10000
+                )
+                return response.choices[0].message.content
         except Exception as e:
             raise Exception(f"Error calling OpenAI API for final summary: {e}")
     
-    def summarize_pdf(self, pdf_path, output_path=None, chunk_method="sentence", parallel=True):
+    def summarize_pdf(self, pdf_path, output_path=None, chunk_method="sentence", parallel=True, detailed=False):
         #extract text
         print(f"Extracting text from {pdf_path}...")
         text = self.extract_text_from_pdf(pdf_path)
@@ -175,7 +211,7 @@ class PdfSummarizer:
         if parallel and len(chunks) > 1:
             with ThreadPoolExecutor(max_workers=min(self.max_workers, len(chunks))) as executor:
                 futures = [
-                    executor.submit(self.summarize_chunk, chunk, i == 0, i == len(chunks) - 1)
+                    executor.submit(self.summarize_chunk, chunk, i == 0, i == len(chunks) - 1, detailed)
                     for i, chunk in enumerate(chunks)
                 ]
                 for future in tqdm(futures):
@@ -184,12 +220,12 @@ class PdfSummarizer:
             for i, chunk in enumerate(tqdm(chunks)):
                 is_first = (i == 0)
                 is_last = (i == len(chunks) - 1)
-                summary = self.summarize_chunk(chunk, is_first, is_last)
+                summary = self.summarize_chunk(chunk, is_first, is_last, detailed)
                 chunk_summaries.append(summary)
         
         #compile final
         print("Compiling final summary...")
-        final_summary = self.compile_summary(chunk_summaries)
+        final_summary = self.compile_summary(chunk_summaries, detailed)
         
         #save to file
         if output_path:
@@ -211,6 +247,8 @@ def main():
     parser.add_argument('--api-key', help='OpenAI API key (alternative to environment variable)')
     parser.add_argument('--max-workers', type=int, default=5, 
                         help='Maximum number of parallel workers (default: 5)')
+    parser.add_argument('--detailed', '-d', action='store_true',
+                        help='Include background information in summary')
     args = parser.parse_args()
     
     #apikey
@@ -223,7 +261,8 @@ def main():
             args.pdf_path, 
             args.output,
             chunk_method=args.chunk_method,
-            parallel=not args.sequential
+            parallel=not args.sequential,
+            detailed=args.detailed
         )
         
         if not args.output:
