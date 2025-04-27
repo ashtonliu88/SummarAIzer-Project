@@ -48,6 +48,7 @@ const UploadArea = () => {
       className="border-2 border-dashed border-gray-300 rounded-2xl bg-[#F8F9FE] p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#5B9BFF] transition-all hover:shadow-lg"
       onClick={handleClick}
       onDragOver={dragOver}
+      onDrop={handleFileChange}
     >
       <input 
         type="file" 
