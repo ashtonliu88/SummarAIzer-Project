@@ -2,7 +2,11 @@ import React, { useRef } from 'react';
 import { Upload } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
-const UploadArea = () => {
+interface UploadAreaProps {
+  onSummaryReady: (summary: string) => void;
+}
+
+const UploadArea: React.FC<UploadAreaProps> = ({ onSummaryReady }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleClick = () => {
@@ -16,7 +20,7 @@ const UploadArea = () => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("detailed", "false");  // or true, based on DifficultySelector
+    formData.append("detailed", "false");
 
     toast("Uploading and summarizing...");
 
@@ -29,8 +33,8 @@ const UploadArea = () => {
       const data = await response.json();
       if (response.ok) {
         toast.success("Summary Ready!");
-        console.log(data.summary);  // For now, just log it
-        // You could route to a summary page or show a modal here
+        console.log(data.summary);
+        onSummaryReady(data.summary);  // Pass summary to parent
       } else {
         toast.error(`Error: ${data.error}`);
       }
