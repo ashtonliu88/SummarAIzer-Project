@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import UploadArea from '@/components/UploadArea';
 import DifficultySelector from '@/components/DifficultySelector';
+import TTSPlayer from '@/components/TTSPlayer';
 
 const Index = () => {
+  const [summary, setSummary] = useState<string>("");
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -17,11 +20,15 @@ const Index = () => {
           </p>
         </div>
         
-        <div className="mb-8"> {/* Reduced bottom margin */}
-          <UploadArea />
+        <div className="mb-8">
+          <UploadArea onSummaryReady={setSummary} />
         </div>
+
+        {summary && (
+          <TTSPlayer summary={summary} />
+        )}
         
-        <div className="flex justify-center"> {/* Added centering */}
+        <div className="flex justify-center mt-8">
           <DifficultySelector />
         </div>
       </main>
