@@ -9,8 +9,9 @@ const UploadArea = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>) => {
+    //const file = e.target.files?.[0];
+    const file = 'dataTransfer' in e ? e.dataTransfer.files?.[0] : e.target.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
@@ -38,10 +39,16 @@ const UploadArea = () => {
     }
   };
 
+  const dragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
   return (
     <div 
       className="border-2 border-dashed border-gray-300 rounded-2xl bg-[#F8F9FE] p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#5B9BFF] transition-all hover:shadow-lg"
       onClick={handleClick}
+      onDragOver={dragOver}
+      onDrop={handleFileChange}
     >
       <input 
         type="file" 
