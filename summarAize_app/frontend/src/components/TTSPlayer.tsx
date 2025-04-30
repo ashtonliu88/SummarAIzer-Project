@@ -39,7 +39,6 @@ const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary }) => {
 
   return (
     <div className="mt-6 flex flex-col items-center">
-      <p className="text-gray-700 mb-4 max-w-xl text-center">{summary}</p>
       {audioUrl ? (
         <>
           <audio controls>

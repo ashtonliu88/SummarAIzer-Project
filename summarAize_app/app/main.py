@@ -21,13 +21,16 @@ summarizer = PdfSummarizer()
 AUDIO_FOLDER = "app/generated_audios"
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
+UPLOAD_FOLDER = "app/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 @app.post("/summarize")
 async def summarize_pdf_endpoint(
     file: UploadFile = File(...),
     detailed: bool = Form(False)
 ):
     try:
-        pdf_path = f"app/uploads/{file.filename}"
+        pdf_path = os.path.join(UPLOAD_FOLDER, file.filename)
         with open(pdf_path, "wb") as f:
             f.write(await file.read())
         
