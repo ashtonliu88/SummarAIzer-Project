@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import uuid
 from gtts import gTTS
-from app.textSummarize import PdfSummarizer
+from textSummarize import PdfSummarizer
 
 app = FastAPI()
 
@@ -18,10 +18,10 @@ app.add_middleware(
 
 summarizer = PdfSummarizer()
 
-AUDIO_FOLDER = "app/generated_audios"
+AUDIO_FOLDER = "generated_audios"
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-UPLOAD_FOLDER = "app/uploads"
+UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.post("/summarize")
