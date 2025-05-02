@@ -10,6 +10,12 @@ import re
 
 load_dotenv()
 
+MATH_INJECTION = (
+    "Whenever you mention any mathematical expression—complexities, equations, Greek letters, "
+    "sums, integrals, subscripts/superscripts—wrap it in LaTeX delimiters: `$...$` for inline math "
+    "and `$$...$$` for display math.\n\n"
+)
+
 class PdfSummarizer:
     def __init__(self, api_key=None, model="gpt-4o", max_tokens=8192, overlap=200, max_workers=5):
         self.model = model
@@ -110,12 +116,19 @@ class PdfSummarizer:
             """
             
         try:
+            system_msg = MATH_INJECTION + (
+                "You are a research assistant that creates concise yet comprehensive summaries of academic papers."
+                if not detailed
+                else
+                "You are a research assistant that creates comprehensive summaries of academic papers with detailed breakdowns "
+                "of each subtopic and concept within the research paper for complete beginners."
+            )
             # Updated API call for OpenAI SDK 1.0.0+
             if not detailed:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are a research assistant that creates concise yet comprehensive summaries of academic papers."},
+                        {"role": "system", "content": system_msg},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.3,
@@ -126,8 +139,7 @@ class PdfSummarizer:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are a research assistant that creates comprehensive summaries of academic papers with detailed breakdowns"
-                        "of each subtopic and concept within the research paper for complete beginners."},
+                        {"role": "system", "content": system_msg},
                         {"role": "user", "content": f"For any summary, extract keywords and give a long detailed explanation for every keyword for someone with no background knowledge. {prompt}"}
                     ],
                     temperature=0.3,
@@ -163,11 +175,19 @@ class PdfSummarizer:
             """
         
         try:
+            system_msg = MATH_INJECTION + (
+                "You are a research assistant that creates cohesive summaries from partial summaries of academic papers."
+                if not detailed
+                else
+                "You are a research assistant that creates cohesive summaries from partial summaries of academic papers "
+                "with detailed breakdowns of each subtopic and concept within the research paper for complete beginners."
+            )
+
             if not detailed: 
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are a research assistant that creates cohesive summaries from partial summaries of academic papers."},
+                        {"role": "system", "content": system_msg},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.3,
@@ -178,8 +198,7 @@ class PdfSummarizer:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are a research assistant that creates creates cohesive summaries from partial summaries of academic papers"
-                        " with detailed breakdowns of each subtopic and concept within the research paper for complete beginners."},
+                        {"role": "system", "content": system_msg},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.3,
