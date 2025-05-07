@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  backend:
+    build:
+      context: ./summarAize_app/app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./summarAize_app/app:/app
+      - ./summarAize_app/app/uploads:/app/uploads
+      - ./summarAize_app/app/generated_audios:/app/generated_audios
+      - ./summarAize_app/app/images:/app/images
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./summarAize_app/frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
