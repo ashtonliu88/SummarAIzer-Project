@@ -36,7 +36,7 @@ async def summarize_pdf_endpoint(
             f.write(await file.read())
         
         is_detailed = (length == "detailed")
-        summary = summarizer.summarize_pdf(pdf_path, detailed=is_detailed) 
+        summary = summarizer.summarize_pdf(pdf_path, length=length) 
         # for debugging
         print(f"[DEBUG] Generated {length} summary:\n{summary}\n")
         os.remove(pdf_path)

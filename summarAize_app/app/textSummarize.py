@@ -123,7 +123,7 @@ class PdfSummarizer:
                 max_tokens = 300
             elif detailed:
                 system_msg = MATH_INJECTION + "You are a research assistant that creates comprehensive summaries with detailed breakdowns of each subtopic for complete beginners."
-                max_toks   = 5000
+                max_tokens = 5000
             else:
                 system_msg = MATH_INJECTION + "You are a research assistant that creates concise yet comprehensive summaries of academic papers."
                 max_tokens = 1500
@@ -235,6 +235,7 @@ class PdfSummarizer:
             raise Exception(f"Error calling OpenAI API for final summary: {e}")
     
     def summarize_pdf(self, pdf_path, output_path=None, chunk_method="sentence", parallel=True, length="medium"):
+        is_detailed = (length == "detailed")
         #extract text
         print(f"Extracting text from {pdf_path}...")
         text = self.extract_text_from_pdf(pdf_path)
@@ -256,7 +257,7 @@ class PdfSummarizer:
         if parallel and len(chunks) > 1:
             with ThreadPoolExecutor(max_workers=min(self.max_workers, len(chunks))) as executor:
                 futures = [
-                    executor.submit(self.summarize_chunk, chunk, i == 0, i == len(chunks) - 1, length == "detailed", length)
+                    executor.submit(self.summarize_chunk, chunk, i == 0, i == len(chunks) - 1, is_detailed, length)
                     for i, chunk in enumerate(chunks)
                 ]
                 for future in tqdm(futures):
@@ -267,7 +268,7 @@ class PdfSummarizer:
                     chunk, 
                     i == 0, 
                     i == len(chunks) - 1, 
-                    length == "detailed", 
+                    is_detailed, 
                     length)
                 # is_first = (i == 0)
                 # is_last = (i == len(chunks) - 1)
@@ -276,7 +277,7 @@ class PdfSummarizer:
         
         #compile final
         print("Compiling final summary...")
-        final_summary = self.compile_summary(chunk_summaries, detailed)
+        final_summary = self.compile_summary(chunk_summaries, is_detailed)
         
         #save to file
         if output_path:
