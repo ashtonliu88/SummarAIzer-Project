@@ -40,3 +40,14 @@
 .read-the-docs {
   color: #888;
 }
+
+.length-selector select {
+  background: white;
+  border: 1 px solid #d1d4db;
+  border-radius: 4px;
+}
+
+.length-selector label {
+  display: inline-flex;
+  align-items: center;
+}

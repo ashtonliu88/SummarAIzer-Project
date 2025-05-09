@@ -2,11 +2,13 @@ import React, { useRef } from 'react';
 import { Upload } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
-interface UploadAreaProps {
+export interface UploadAreaProps {
   onSummaryReady: (summary: string) => void;
+  length: 'short' | 'medium' | 'detailed';
 }
+  
 
-const UploadArea: React.FC<UploadAreaProps> = ({ onSummaryReady }) => {
+const UploadArea: React.FC<UploadAreaProps> = ({ onSummaryReady, length }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleClick = () => {
@@ -20,8 +22,8 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onSummaryReady }) => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("detailed", "false");
-
+    // formData.append("detailed", "false");
+    formData.append("length", length);
     toast("Uploading and summarizing...");
 
     try {

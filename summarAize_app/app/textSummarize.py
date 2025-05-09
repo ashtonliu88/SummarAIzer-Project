@@ -80,7 +80,7 @@ class PdfSummarizer:
         
         return chunks
     
-    def summarize_chunk(self, chunk, is_first=False, is_last=False, detailed=False):
+    def summarize_chunk(self, chunk, is_first=False, is_last=False, detailed=False, length="medium"):
         if is_first and is_last:
             prompt = f"""
             Please summarize the following research paper. Cover the key findings, methodology, 
@@ -114,40 +114,66 @@ class PdfSummarizer:
             Research paper section:
             {chunk}
             """
-            
         try:
-            system_msg = MATH_INJECTION + (
-                "You are a research assistant that creates concise yet comprehensive summaries of academic papers."
-                if not detailed
-                else
-                "You are a research assistant that creates comprehensive summaries of academic papers with detailed breakdowns "
-                "of each subtopic and concept within the research paper for complete beginners."
-            )
-            # Updated API call for OpenAI SDK 1.0.0+
-            if not detailed:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_msg},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.3,
-                    max_tokens=1500
-                )
-                return response.choices[0].message.content
+            is_short = (length == "short")
+            is_medium = (length == "medium")
+
+            if is_short:
+                system_msg = MATH_INJECTION + "You are a research assistant that creates very short summaries (no more than 3 sentences)."
+                max_tokens = 300
+            elif detailed:
+                system_msg = MATH_INJECTION + "You are a research assistant that creates comprehensive summaries with detailed breakdowns of each subtopic for complete beginners."
+                max_toks   = 5000
             else:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_msg},
-                        {"role": "user", "content": f"For any summary, extract keywords and give a long detailed explanation for every keyword for someone with no background knowledge. {prompt}"}
-                    ],
-                    temperature=0.3,
-                    max_tokens=5000
-                )
-                return response.choices[0].message.content
+                system_msg = MATH_INJECTION + "You are a research assistant that creates concise yet comprehensive summaries of academic papers."
+                max_tokens = 1500
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content
         except Exception as e:
             raise Exception(f"Error calling OpenAI API: {e}")
+        
+        # try:
+        #     system_msg = MATH_INJECTION + (
+        #         "You are a research assistant that creates concise yet comprehensive summaries of academic papers."
+        #         if not detailed
+        #         else
+        #         "You are a research assistant that creates comprehensive summaries of academic papers with detailed breakdowns "
+        #         "of each subtopic and concept within the research paper for complete beginners."
+        #     )
+        #     # Updated API call for OpenAI SDK 1.0.0+
+        #     if not detailed:
+        #         response = self.client.chat.completions.create(
+        #             model=self.model,
+        #             messages=[
+        #                 {"role": "system", "content": system_msg},
+        #                 {"role": "user", "content": prompt}
+        #             ],
+        #             temperature=0.3,
+        #             max_tokens=1500
+        #         )
+        #         return response.choices[0].message.content
+        #     else:
+        #         response = self.client.chat.completions.create(
+        #             model=self.model,
+        #             messages=[
+        #                 {"role": "system", "content": system_msg},
+        #                 {"role": "user", "content": f"For any summary, extract keywords and give a long detailed explanation for every keyword for someone with no background knowledge. {prompt}"}
+        #             ],
+        #             temperature=0.3,
+        #             max_tokens=5000
+        #         )
+        #         return response.choices[0].message.content
+        # except Exception as e:
+        #     raise Exception(f"Error calling OpenAI API: {e}")
     
     #compile chunks
     def compile_summary(self, chunk_summaries, detailed=False):
@@ -208,7 +234,7 @@ class PdfSummarizer:
         except Exception as e:
             raise Exception(f"Error calling OpenAI API for final summary: {e}")
     
-    def summarize_pdf(self, pdf_path, output_path=None, chunk_method="sentence", parallel=True, detailed=False):
+    def summarize_pdf(self, pdf_path, output_path=None, chunk_method="sentence", parallel=True, length="medium"):
         #extract text
         print(f"Extracting text from {pdf_path}...")
         text = self.extract_text_from_pdf(pdf_path)
@@ -230,16 +256,22 @@ class PdfSummarizer:
         if parallel and len(chunks) > 1:
             with ThreadPoolExecutor(max_workers=min(self.max_workers, len(chunks))) as executor:
                 futures = [
-                    executor.submit(self.summarize_chunk, chunk, i == 0, i == len(chunks) - 1, detailed)
+                    executor.submit(self.summarize_chunk, chunk, i == 0, i == len(chunks) - 1, length == "detailed", length)
                     for i, chunk in enumerate(chunks)
                 ]
                 for future in tqdm(futures):
                     chunk_summaries.append(future.result())
         else:
             for i, chunk in enumerate(tqdm(chunks)):
-                is_first = (i == 0)
-                is_last = (i == len(chunks) - 1)
-                summary = self.summarize_chunk(chunk, is_first, is_last, detailed)
+                summary = self.summarize_chunk(
+                    chunk, 
+                    i == 0, 
+                    i == len(chunks) - 1, 
+                    length == "detailed", 
+                    length)
+                # is_first = (i == 0)
+                # is_last = (i == len(chunks) - 1)
+                # summary = self.summarize_chunk(chunk, is_first, is_last, detailed)
                 chunk_summaries.append(summary)
         
         #compile final

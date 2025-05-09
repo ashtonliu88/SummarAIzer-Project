@@ -27,14 +27,18 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.post("/summarize")
 async def summarize_pdf_endpoint(
     file: UploadFile = File(...),
-    detailed: bool = Form(False)
+    # detailed: bool = Form(False),
+    length: str = Form("medium")
 ):
     try:
         pdf_path = os.path.join(UPLOAD_FOLDER, file.filename)
         with open(pdf_path, "wb") as f:
             f.write(await file.read())
         
-        summary = summarizer.summarize_pdf(pdf_path, detailed=False) # Detailed is hard coded right now, TODO: change
+        is_detailed = (length == "detailed")
+        summary = summarizer.summarize_pdf(pdf_path, detailed=is_detailed) 
+        # for debugging
+        print(f"[DEBUG] Generated {length} summary:\n{summary}\n")
         os.remove(pdf_path)
 
         return JSONResponse(content={"summary": summary})

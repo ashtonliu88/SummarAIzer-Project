@@ -8,6 +8,8 @@ import TTSPlayer from '@/components/TTSPlayer';
 
 const Index = () => {
   const [summary, setSummary] = useState<string>('');
+  // for summary length
+  const [length, setLength] = useState<'short'|'medium'|'detailed'>('medium');
 
   return (
     <div className="min-h-screen bg-white">
@@ -22,7 +24,25 @@ const Index = () => {
           </p>
         </header>
 
-        <UploadArea onSummaryReady={setSummary} />
+        {/* <UploadArea onSummaryReady={setSummary} /> */}
+
+        <div className="length-selector mb-6">
+          <label className="mr-4 font-medium text-gray-700">
+            Summary Length:
+            <select
+              value={length}
+              onChange={e => setLength(e.target.value as any)}
+              className="ml-2 p-2 border border-gray-300 rounded px-2 py-1"
+              >
+                <option value="short">Short</option>
+                <option value="medium">Medium</option>
+                <option value="detailed">Detailed</option>
+              </select>
+          </label>
+        </div>
+
+        <UploadArea onSummaryReady={setSummary} length={length} />
+
 
         {summary && (
           <section className="space-y-8">
