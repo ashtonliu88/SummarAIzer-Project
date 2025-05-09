@@ -1,4 +1,6 @@
 // src/pages/Index.tsx
+import { ThemeToggle } from "@/components/theme-toggle";
+import { ModeToggle } from "@/components/mode-toggle";
 import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import UploadArea from '@/components/UploadArea';
@@ -12,8 +14,11 @@ const Index = () => {
   const [length, setLength] = useState<'short'|'medium'|'detailed'>('medium');
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background text-foreground">
       <Navbar />
+      <div className="flex justify-end px-4 mt-4">
+        <ModeToggle />
+      </div>
       <main className="max-w-3xl mx-auto px-4 py-12 space-y-12">
         <header className="text-center space-y-4">
           <h1 className="text-4xl font-extrabold text-[#2261CF]">
@@ -46,15 +51,15 @@ const Index = () => {
 
         {summary && (
           <section className="space-y-8">
-            <article className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+            <article className="bg-card text-card-foreground p-8 rounded-2xl shadow-lg border border-border">
               <SummaryViewer markdown={summary} />
             </article>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-center">
-              <TTSPlayer summary={summary} />
+            <div className="bg-card text-card-foreground p-6 rounded-xl shadow-sm border border-border flex justify-center">
+            <TTSPlayer summary={summary} />
             </div>
           </section>
         )}
-        <footer className="flex justify-center">
+        <footer className="flex justify-center bg-background">
           <DifficultySelector />
         </footer>
       </main>
