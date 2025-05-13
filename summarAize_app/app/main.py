@@ -5,6 +5,8 @@ import os
 import uuid
 from gtts import gTTS
 from app.textSummarize import PdfSummarizer
+from fastapi.staticfiles import StaticFiles
+import json
 
 app = FastAPI()
 
@@ -23,6 +25,19 @@ os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 UPLOAD_FOLDER = "app/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+IMAGE_FOLDER = "app/images"
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
+
+app.mount("/images", StaticFiles(directory=IMAGE_FOLDER), name="images")
+
+def generate_index(image_folder: str):
+    files = sorted(
+        f for f in os.listdir(image_folder) if f.lower().endswith((".png", ".jpg", ".jpeg"))
+    )
+    index_path = os.path.join(image_folder, "index.json")
+    with open(index_path, "w") as f:
+        json.dump(files, f)
 
 @app.post("/summarize")
 async def summarize_pdf_endpoint(
@@ -63,3 +78,11 @@ async def get_audio(filename: str):
         return FileResponse(filepath, media_type="audio/mpeg")
     else:
         return JSONResponse(content={"error": "File not found"}, status_code=404)
+    
+@app.get("/images/index.json")
+async def get_image_index():
+    generate_index(IMAGE_FOLDER)
+    index_path = os.path.join(IMAGE_FOLDER, "index.json")
+    if os.path.exists(index_path):
+        return FileResponse(index_path, media_type="application/json")
+    return JSONResponse(content={"error": "Index not found"}, status_code=404)
