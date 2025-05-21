@@ -14,15 +14,15 @@ AUDIO.mkdir(exist_ok=True)
 
 @router.post("/align")
 async def align_endpoint(
-    # option A – upload both files now
+    # upload both files now
     audio: UploadFile | None = File(None),
     transcript: UploadFile | None = File(None),
-    # option B – refer to existing filenames
+    # refer to existing filenames
     audio_name: str | None = Form(None),
     text_name: str | None  = Form(None),
     lang: str = Form("eng")
 ):
-    # -------- 1. resolve paths ----------
+    # -------- resolve paths ----------
     if audio and transcript:
         with tempfile.NamedTemporaryFile(delete=False, dir=AUDIO) as a:
             shutil.copyfileobj(audio.file, a)
@@ -39,7 +39,7 @@ async def align_endpoint(
     else:
         raise HTTPException(400, "Must upload files or give filenames.")
 
-    # -------- 2. run aeneas ----------
+    # -------- run aeneas ----------
     try:
         json_path = align(audio_path, text_path, lang)
     except Exception as e:
