@@ -5,6 +5,7 @@ import UploadArea from '@/components/UploadArea';
 import DifficultySelector from '@/components/DifficultySelector';
 import SummaryViewer from '@/components/SummaryViewer';
 import TTSPlayer from '@/components/TTSPlayer';
+import ExtractedImages from '@/components/ExtractedImages';
 
 const Index = () => {
   const [summary, setSummary] = useState<string>('');
@@ -34,6 +35,12 @@ const Index = () => {
             </div>
           </section>
         )}
+
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Extracted Figures</h2>
+          <ExtractedImages folderUrl="http://localhost:8000/images" />
+        </section>
+        
         <footer className="flex justify-center">
           <DifficultySelector />
         </footer>
