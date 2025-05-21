@@ -8,7 +8,6 @@ import Library from "./pages/Library";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
-
 const queryClient = new QueryClient();
 
 const App = () => (
