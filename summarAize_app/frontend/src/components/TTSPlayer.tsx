@@ -5,24 +5,31 @@ interface TTSPlayerProps {
   summary: string;
 }
 
+const API = import.meta.env.VITE_API_URL || "";  
+
 const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary }) => {
   const [audioUrl, setAudioUrl] = useState<string>("");
 
   useEffect(() => {
     const generateAudio = async () => {
-      if (!summary) return;
+      if (!summary){
+        console.log("[TTSPlayer] no summary, aborting");
+        return;
+      }
 
       toast("Generating audio...");
       try {
-        const response = await fetch("http://127.0.0.1:8000/generate-audio", {
+        const response = await fetch(`${API}/generate-audio`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(summary),
+          body: JSON.stringify({ summary }),
         });
+        console.log("[TTSPlayer] fetch returned status", response.status);
 
         const data = await response.json();
+        console.log("[TTSPlayer] parsed JSON:", data);
         if (response.ok) {
-          setAudioUrl(data.audio_url);
+          setAudioUrl(`${API}${data.audio_url}`);
           toast.success("Audio Ready!");
         } else {
           toast.error(`Audio Error: ${data.error}`);

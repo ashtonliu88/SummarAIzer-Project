@@ -228,6 +228,10 @@ class AudioRequest(BaseModel):
     summary: str | None = None
     text_name: str | None = None
 
+class AudioRequest(BaseModel):
+    summary: str | None = None
+    text_name: str | None = None
+
 @app.post("/generate-audio")
 async def generate_audio(req: AudioRequest):
     summary   = req.summary
