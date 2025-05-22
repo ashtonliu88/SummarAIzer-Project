@@ -1,13 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, Form, Body
+from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import uuid
-import re
-import requests
-from gtts import gTTS
 from textSummarize import PdfSummarizer
 import requests
+import os, uuid, pathlib
+from gtts import gTTS
+from routers import align_router
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -19,13 +18,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(align_router.router) 
+
+BASE = pathlib.Path(__file__).parent
+UPLOAD_FOLDER   = BASE / "uploads"
+AUDIO_FOLDER    = BASE / "generated_audios"
+for p in (UPLOAD_FOLDER, AUDIO_FOLDER):
+    p.mkdir(exist_ok=True)
+
 summarizer = PdfSummarizer()
-
-AUDIO_FOLDER = "app/generated_audios"
-os.makedirs(AUDIO_FOLDER, exist_ok=True)
-
-UPLOAD_FOLDER = "app/uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def extract_title_from_reference(ref):
     """Extract potential title from a reference string."""
@@ -205,66 +206,57 @@ async def summarize_pdf_endpoint(
     citations: bool = Form(False)
 ):
     try:
-        pdf_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        with open(pdf_path, "wb") as f:
-            f.write(await file.read())
+        pdf_path = UPLOAD_FOLDER / file.filename
+        pdf_path.write_bytes(await file.read())
         
-        # First extract text from the PDF
-        text = summarizer.extract_text_from_pdf(pdf_path)
-        
-        # Extract references and keywords
-        references = summarizer.extract_references(text)
-        keywords = summarizer.extract_keywords(text)
-        print(f"Found {len(references)} references and {len(keywords)} keywords in the document")
-        
-        # Convert detailed string to boolean
-        is_detailed = detailed.lower() == "true"
-        
-        # Generate summary with citations if requested
-        summary = summarizer.summarize_pdf(
-            pdf_path, 
-            detailed=is_detailed,
-            include_citations=citations
-        )
-        
-        # Get related papers based on references
-        related_papers = []
-        if references:
-            related_papers = get_related_papers(references)
-        
-        # Clean up uploaded file
-        os.remove(pdf_path)
+        summary = summarizer.summarize_pdf(pdf_path, detailed=detailed)
+        txt_name = f"{pdf_path.stem}.txt"
+        txt_path = UPLOAD_FOLDER / txt_name
+        txt_path.write_text(summary, encoding="utf-8")
 
-        return JSONResponse(content={
-            "summary": summary, 
-            "references": references,
-            "referenceCount": len(references),
-            "relatedPapers": related_papers,
-            "hasCitations": citations,
-            "keywords": keywords
-        })
+        return JSONResponse(
+            {
+                "summary": summary,
+                "text_name": txt_name
+            }
+        )
     
     except Exception as e:
-        print(f"Error processing PDF: {e}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+class AudioRequest(BaseModel):
+    summary: str | None = None
+    text_name: str | None = None
+
+class AudioRequest(BaseModel):
+    summary: str | None = None
+    text_name: str | None = None
 
 @app.post("/generate-audio")
-async def generate_audio(summary: str = Body(...)):
-    try:
-        filename = f"{uuid.uuid4()}.mp3"
-        filepath = os.path.join(AUDIO_FOLDER, filename)
+async def generate_audio(req: AudioRequest):
+    summary   = req.summary
+    text_name = req.text_name
 
-        tts = gTTS(text=summary)
-        tts.save(filepath)
+    if text_name:
+        txt_path = UPLOAD_FOLDER / text_name
+        if not txt_path.exists():
+            raise HTTPException(404, "summary file not found on server")
+        summary = txt_path.read_text(encoding="utf-8")
+        stem = pathlib.Path(text_name).stem
+        audio_name = f"{stem}.mp3"
+    elif summary:
+        audio_name = f"{uuid.uuid4()}.mp3"
+    else:
+        raise HTTPException(400, "Need either summary string or text_name.")
 
-        return {"audio_url": f"http://127.0.0.1:8000/audio/{filename}"}
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+    audio_path = AUDIO_FOLDER / audio_name
+    gTTS(text=summary).save(audio_path)
+    return {"audio_url": f"/audio/{audio_name}", "audio_name": audio_name}
+
 
 @app.get("/audio/{filename}")
 async def get_audio(filename: str):
-    filepath = os.path.join(AUDIO_FOLDER, filename)
-    if os.path.exists(filepath):
+    filepath = AUDIO_FOLDER / filename
+    if filepath.exists():
         return FileResponse(filepath, media_type="audio/mpeg")
-    else:
-        return JSONResponse(content={"error": "File not found"}, status_code=404)
+    return JSONResponse({"error": "File not found"}, status_code=404)
