@@ -25,9 +25,9 @@ const DifficultySelector: React.FC<DifficultySelectorProps> = ({
         variant="ghost"
         className={`${
           selectedDifficulty === 'beginner' 
-            ? 'bg-[#5B9BFF] text-white' 
-            : 'text-gray-600 hover:bg-gray-100'
-        } rounded-full px-6 py-2 text-sm font-medium transition-colors duration-300 ease-in-out`}
+            ? 'bg-[#5B9BFF] text-white hover:bg-[#5B9BFF] hover:text-white' 
+            : 'text-gray-600 hover:bg-[#5B9BFF] hover:text-white'
+        } rounded-full px-6 py-2 text-sm font-medium transition-none`}
         onClick={() => onDifficultyChange('beginner')}
       >
         Beginner
@@ -36,9 +36,9 @@ const DifficultySelector: React.FC<DifficultySelectorProps> = ({
         variant="ghost"
         className={`${
           selectedDifficulty === 'intermediate' 
-            ? 'bg-[#5B9BFF] text-white' 
-            : 'text-gray-600 hover:bg-gray-100'
-        } rounded-full px-6 py-2 text-sm font-medium transition-colors duration-300 ease-in-out`}
+            ? 'bg-[#5B9BFF] text-white hover:bg-[#5B9BFF] hover:text-white' 
+            : 'text-gray-600 hover:bg-[#5B9BFF] hover:text-white'
+        } rounded-full px-6 py-2 text-sm font-medium transition-none`}
         onClick={() => onDifficultyChange('intermediate')}
       >
         Intermediate
@@ -47,15 +47,15 @@ const DifficultySelector: React.FC<DifficultySelectorProps> = ({
         variant="ghost"
         className={`${
           selectedDifficulty === 'advanced' 
-            ? 'bg-[#5B9BFF] text-white' 
-            : 'text-gray-600 hover:bg-gray-100'
-        } rounded-full px-6 py-2 text-sm font-medium transition-colors duration-300 ease-in-out`}
+            ? 'bg-[#5B9BFF] text-white hover:bg-[#5B9BFF] hover:text-white' 
+            : 'text-gray-600 hover:bg-[#5B9BFF] hover:text-white'
+        } rounded-full px-6 py-2 text-sm font-medium transition-none`}
         onClick={() => onDifficultyChange('advanced')}
       >
         Advanced
       </Button>
       <Button 
-        className={`rounded-full px-6 py-2 text-sm font-medium ml-auto transition-all duration-300 ease-in-out transform hover:scale-105 ${
+        className={`rounded-full px-6 py-2 text-sm font-medium ml-auto transition-none ${
           isProcessing || !isFileSelected
             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
             : 'bg-[#2261CF] text-white hover:bg-[#1B50B0] hover:shadow-md'
