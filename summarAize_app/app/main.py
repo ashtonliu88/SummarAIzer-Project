@@ -21,10 +21,10 @@ app.add_middleware(
 
 summarizer = PdfSummarizer()
 
-AUDIO_FOLDER = "generated_audios"
+AUDIO_FOLDER = "app/generated_audios"
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = "app/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def extract_title_from_reference(ref):

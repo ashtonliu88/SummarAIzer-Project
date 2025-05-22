@@ -1,11 +1,9 @@
 import fitz  # PyMuPDF
 import os
 import argparse
+from moviepy.editor import ImageSequenceClip
 
 def extract_images(pdf_path, output_folder):
-    """
-    Extract images from the specified PDF and save them to the output folder.
-    """
     os.makedirs(output_folder, exist_ok=True)
     doc = fitz.open(pdf_path)
     
@@ -31,21 +29,26 @@ def extract_images(pdf_path, output_folder):
             
             print(f"Extracted {image_name}")
 
-    
+def create_video_from_images(image_paths, output_video_path, fps=1):
+
+    if not image_paths:
+        return
+
+    clip = ImageSequenceClip(image_paths, fps=fps)
+    clip.write_videofile(output_video_path, codec="libx264", audio=False)
+    print(f"Video saved to {output_video_path}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Extract images from a PDF file.")
-    parser.add_argument(
-        "pdf_path", help="path to the PDF to extract images"
-    )
-    parser.add_argument(
-        "-o", "--output", default="extracted_images",
-        help="place to save extracted images"
-    )
+    parser.add_argument("pdf_path", help="path to the PDF to extract images")
+    parser.add_argument("-o", "--output", default="extracted_images",help="place to save extracted images")
+    parser.add_argument("-v", "--video", default="output_video.mp4", help="Path to save the video file")
+    parser.add_argument("--fps", type=int, default=1, help="Frames per second for the video")
     args = parser.parse_args()
 
-    extract_images(args.pdf_path, args.output)
+    images = extract_images(args.pdf_path, args.output)
+    create_video_from_images(images, args.video, fps=args.fps)
 
 
 if __name__ == "__main__":
