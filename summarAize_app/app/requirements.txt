@@ -10,6 +10,7 @@ fastapi==0.115.12
 h11==0.14.0
 httpcore==1.0.8
 httpx==0.28.1
+gtts==2.4.0
 idna==3.10
 jiter==0.9.0
 openai==1.75.0
