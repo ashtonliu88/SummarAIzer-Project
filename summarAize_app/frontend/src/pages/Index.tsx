@@ -8,6 +8,7 @@ import TTSPlayer from '@/components/TTSPlayer';
 
 const Index = () => {
   const [summary, setSummary] = useState<string>('');
+  const [images, setImages]   = useState<string[]>([]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -22,9 +23,10 @@ const Index = () => {
           </p>
         </header>
 
-        <UploadArea onSummaryReady={setSummary} />
+        <UploadArea onSummaryReady={(text, imgs) => { setSummary(text); setImages(imgs);}} />
 
         {summary && (
+          <>
           <section className="space-y-8">
             <article className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
               <SummaryViewer markdown={summary} />
@@ -33,7 +35,23 @@ const Index = () => {
               <TTSPlayer summary={summary} />
             </div>
           </section>
+          
+          {images.length > 0 && (
+              
+              <section className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {images.map((src) => (
+                  <img
+                    key={src}
+                    src={`http://127.0.0.1:8000${src}`}
+                    alt="Extracted from paper"
+                    className="rounded-lg border"
+                  />
+                ))}
+              </section>
+            )}
+          </>
         )}
+
         <footer className="flex justify-center">
           <DifficultySelector />
         </footer>

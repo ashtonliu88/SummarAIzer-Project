@@ -2,8 +2,13 @@ import React, { useRef } from 'react';
 import { Upload } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
+// interface UploadAreaProps {
+//   onSummaryReady: (summary: string) => void;
+// }
+
 interface UploadAreaProps {
-  onSummaryReady: (summary: string) => void;
+  /** now returns both text and image URLs */
+  onSummaryReady: (summary: string, images: string[]) => void;
 }
 
 const UploadArea: React.FC<UploadAreaProps> = ({ onSummaryReady }) => {
@@ -33,8 +38,9 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onSummaryReady }) => {
       const data = await response.json();
       if (response.ok) {
         toast.success("Summary Ready!");
-        console.log(data.summary);
-        onSummaryReady(data.summary);  // Pass summary to parent
+        console.log("It works");
+        console.log(data.images);
+        onSummaryReady(data.summary, data.images || []);  // Pass summary to parent
       } else {
         toast.error(`Error: ${data.error}`);
       }

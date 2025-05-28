@@ -1,28 +1,42 @@
-from fastapi import FastAPI, UploadFile, File, Form, Body
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 import uuid
+
 from gtts import gTTS
-from app.textSummarize import PdfSummarizer
+from textSummarize import PdfSummarizer
+from imageExtract import extract_images
 
 app = FastAPI()
 
+# Enable CORS for all origins (development only)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Define base folders as Path objects
+UPLOAD_FOLDER = Path("uploads")
+IMAGE_FOLDER  = Path("images")
+AUDIO_FOLDER  = Path("generated_audios")
+
+# Create directories if they don't exist
+for folder in (UPLOAD_FOLDER, IMAGE_FOLDER, AUDIO_FOLDER):
+    folder.mkdir(parents=True, exist_ok=True)
+
+# Mount static file serving for extracted images
+app.mount(
+    "/images", StaticFiles(directory=IMAGE_FOLDER),
+    name="images"
+)
+
+# Initialize summarizer
 summarizer = PdfSummarizer()
-
-AUDIO_FOLDER = "generated_audios"
-os.makedirs(AUDIO_FOLDER, exist_ok=True)
-
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.post("/summarize")
 async def summarize_pdf_endpoint(
@@ -30,36 +44,46 @@ async def summarize_pdf_endpoint(
     detailed: bool = Form(False)
 ):
     try:
-        pdf_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        # 1) Save uploaded PDF under a unique subfolder
+        pdf_id = uuid.uuid4().hex
+        pdf_dir = UPLOAD_FOLDER / pdf_id
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path = pdf_dir / file.filename
         with open(pdf_path, "wb") as f:
             f.write(await file.read())
-        
-        summary = summarizer.summarize_pdf(pdf_path, detailed=False) # Detailed is hard coded right now, TODO: change
-        os.remove(pdf_path)
 
-        return JSONResponse(content={"summary": summary})
-    
+        # 2) Extract images into the shared images folder
+        image_files = extract_images(str(pdf_path), str(IMAGE_FOLDER))
+
+        # 3) Generate text summary
+        summary = summarizer.summarize_pdf(str(pdf_path), detailed=detailed)
+
+        # 4) Build public URLs for each image
+        image_urls = [f"/images/{name}" for name in image_files]
+
+        return JSONResponse({
+            "summary": summary,
+            "images": image_urls
+        })
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.post("/generate-audio")
-async def generate_audio(summary: str = Body(...)):
+async def generate_audio(summary: str = Form(...)):
     try:
-        filename = f"{uuid.uuid4()}.mp3"
-        filepath = os.path.join(AUDIO_FOLDER, filename)
+        filename = f"{uuid.uuid4().hex}.mp3"
+        filepath = AUDIO_FOLDER / filename
 
         tts = gTTS(text=summary)
-        tts.save(filepath)
+        tts.save(str(filepath))
 
-        return {"audio_url": f"http://127.0.0.1:8000/audio/{filename}"}
+        return {"audio_url": f"/audio/{filename}"}
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/audio/{filename}")
 async def get_audio(filename: str):
-    filepath = os.path.join(AUDIO_FOLDER, filename)
-    if os.path.exists(filepath):
-        return FileResponse(filepath, media_type="audio/mpeg")
-    else:
-        return JSONResponse(content={"error": "File not found"}, status_code=404)
+    filepath = AUDIO_FOLDER / filename
+    if filepath.exists():
+        return FileResponse(str(filepath), media_type="audio/mpeg")
+    return JSONResponse({"error": "File not found"}, status_code=404)
