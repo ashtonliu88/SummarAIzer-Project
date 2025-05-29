@@ -1,5 +1,5 @@
 // src/components/SummaryViewer.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -9,12 +9,29 @@ import rehypeSanitize from 'rehype-sanitize';
 interface SummaryViewerProps {
   markdown: string;
   hasCitations?: boolean;
+  references?: string[];
+  keywords?: string[];
+  onSummaryUpdate?: (newSummary: string) => void;
 }
 
-const SummaryViewer: React.FC<SummaryViewerProps> = ({ markdown, hasCitations = false }) => {
+const SummaryViewer: React.FC<SummaryViewerProps> = ({ 
+  markdown, 
+  hasCitations = false,
+  references = [],
+  keywords = [],
+  onSummaryUpdate = () => {}
+}) => {
   const [citationStyle, setCitationStyle] = useState<'highlighted' | 'normal' | 'hidden'>(
     hasCitations ? 'highlighted' : 'normal'
   );
+  const [currentSummary, setCurrentSummary] = useState(markdown);
+  const [isUpdated, setIsUpdated] = useState(false);
+  
+  // Effect to update summary when external markdown prop changes
+  useEffect(() => {
+    setCurrentSummary(markdown);
+    setIsUpdated(false);
+  }, [markdown]);
   
   // Process citations in the format [Author, Year] to make them visually distinct
   const processMarkdown = (text: string): string => {
@@ -48,10 +65,35 @@ const SummaryViewer: React.FC<SummaryViewerProps> = ({ markdown, hasCitations = 
     }
   };
 
-  const processedMarkdown = processMarkdown(markdown);
+  const processedMarkdown = processMarkdown(currentSummary);
+  
+  const handleSummaryUpdate = (newSummary: string) => {
+    setCurrentSummary(newSummary);
+    setIsUpdated(true);
+    onSummaryUpdate(newSummary);
+  };
 
   return (
     <div>
+      {isUpdated && (
+        <div className="mb-4 p-3 bg-green-100 text-green-800 border border-green-300 rounded-lg flex items-center justify-between">
+          <div className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span>This summary has been updated based on your chat request.</span>
+          </div>
+          <button 
+            onClick={() => setIsUpdated(false)} 
+            className="text-green-700 hover:text-green-900"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      )}
+        
       {hasCitations && (
         <div className="mb-4 flex justify-end">
           <div className="inline-flex rounded-md shadow-sm" role="group">

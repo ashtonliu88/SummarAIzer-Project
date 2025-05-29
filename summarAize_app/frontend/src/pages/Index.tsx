@@ -8,6 +8,7 @@ import TTSPlayer from '@/components/TTSPlayer';
 import References from '@/components/References';
 import RelatedPapers from '@/components/RelatedPapers';
 import Keywords from '@/components/Keywords';
+import FloatingChatbot from '@/components/FloatingChatbot';
 import { toast } from '@/components/ui/sonner';
 
 interface RelatedPaper {
@@ -95,63 +96,82 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-      <main className="max-w-3xl mx-auto px-4 py-12 space-y-12">
-        <header className="text-center space-y-4">
-          <h1 className="text-4xl font-extrabold text-[#2261CF]">
-            Transform Research
-          </h1>
-          <p className="text-gray-600">
-            Upload a paper and get visual summaries, key concepts, and references.
-          </p>
-        </header>
+    <>
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <main className="max-w-3xl mx-auto px-4 py-12 space-y-12">
+          <header className="text-center space-y-4">
+            <h1 className="text-4xl font-extrabold text-[#2261CF]">
+              Transform Research
+            </h1>
+            <p className="text-gray-600">
+              Upload a paper and get visual summaries, key concepts, and references.
+            </p>
+          </header>
 
-        <div className="space-y-6">
-          <UploadArea 
-            selectedFile={selectedFile}
-            setSelectedFile={setSelectedFile}
-            includeCitations={includeCitations}
-            setIncludeCitations={setIncludeCitations}
-          />
-          
-          <DifficultySelector 
-            selectedDifficulty={difficultyLevel}
-            onDifficultyChange={setDifficultyLevel}
-            onProcess={handleProcess}
-            isProcessing={isProcessing}
-            isFileSelected={!!selectedFile}
-          />
-        </div>
+          <div className="space-y-6">
+            <UploadArea 
+              selectedFile={selectedFile}
+              setSelectedFile={setSelectedFile}
+              includeCitations={includeCitations}
+              setIncludeCitations={setIncludeCitations}
+            />
+            
+            <DifficultySelector 
+              selectedDifficulty={difficultyLevel}
+              onDifficultyChange={setDifficultyLevel}
+              onProcess={handleProcess}
+              isProcessing={isProcessing}
+              isFileSelected={!!selectedFile}
+            />
+          </div>
 
-        {summaryData && (
-          <section className="space-y-8">
-            <article className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
-              <SummaryViewer 
-                markdown={summaryData.summary} 
-                hasCitations={summaryData.hasCitations} 
-              />
-            </article>
-            
-            {summaryData.keywords && summaryData.keywords.length > 0 && (
-              <Keywords keywords={summaryData.keywords} />
-            )}
-            
-            {summaryData.references && summaryData.references.length > 0 && (
-              <References references={summaryData.references} />
-            )}
-            
-            {summaryData.relatedPapers && summaryData.relatedPapers.length > 0 && (
-              <RelatedPapers papers={summaryData.relatedPapers} />
-            )}
-            
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-center">
-              <TTSPlayer summary={summaryData.summary} />
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+          {summaryData && (
+            <section className="space-y-8">
+              <article className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+                <SummaryViewer 
+                  markdown={summaryData.summary} 
+                  hasCitations={summaryData.hasCitations}
+                  references={summaryData.references}
+                  keywords={summaryData.keywords?.map(k => k.keyword)} 
+                  onSummaryUpdate={(newSummary) => {
+                    setSummaryData(prev => prev ? {...prev, summary: newSummary} : null);
+                  }}
+                />
+              </article>
+              
+              {summaryData.keywords && summaryData.keywords.length > 0 && (
+                <Keywords keywords={summaryData.keywords} />
+              )}
+              
+              {summaryData.references && summaryData.references.length > 0 && (
+                <References references={summaryData.references} />
+              )}
+              
+              {summaryData.relatedPapers && summaryData.relatedPapers.length > 0 && (
+                <RelatedPapers papers={summaryData.relatedPapers} />
+              )}
+              
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-center">
+                <TTSPlayer summary={summaryData.summary} />
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
+      
+      {/* Floating Chatbot - positioned at the root level of the component */}
+      {summaryData && (
+        <FloatingChatbot 
+          summary={summaryData.summary}
+          references={summaryData.references}
+          keywords={summaryData.keywords?.map(k => k.keyword)}
+          onSummaryUpdate={(newSummary) => {
+            setSummaryData(prev => prev ? {...prev, summary: newSummary} : null);
+          }}
+        />
+      )}
+    </>
   );
 };
 
