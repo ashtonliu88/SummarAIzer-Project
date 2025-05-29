@@ -5,3 +5,16 @@
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Audio files
+*.mp3
+*.wav
+*.ogg
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Generated audio directories
+**/generated_audios/

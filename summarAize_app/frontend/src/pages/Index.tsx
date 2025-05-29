@@ -129,7 +129,12 @@ const Index = () => {
             <article className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
               <SummaryViewer 
                 markdown={summaryData.summary} 
-                hasCitations={summaryData.hasCitations} 
+                hasCitations={summaryData.hasCitations}
+                references={summaryData.references}
+                keywords={summaryData.keywords?.map(k => k.keyword)} 
+                onSummaryUpdate={(newSummary) => {
+                  setSummaryData(prev => prev ? {...prev, summary: newSummary} : null);
+                }}
               />
             </article>
             
