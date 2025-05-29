@@ -5,8 +5,6 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Chatbot from '@/components/Chatbot';
 
 interface SummaryViewerProps {
   markdown: string;
@@ -76,106 +74,87 @@ const SummaryViewer: React.FC<SummaryViewerProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Main summary area */}
-      <div className="lg:col-span-2">
-        {isUpdated && (
-          <div className="mb-4 p-3 bg-green-100 text-green-800 border border-green-300 rounded-lg flex items-center justify-between">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span>This summary has been updated based on your chat request.</span>
-            </div>
-            <button 
-              onClick={() => setIsUpdated(false)} 
-              className="text-green-700 hover:text-green-900"
+    <div>
+      {isUpdated && (
+        <div className="mb-4 p-3 bg-green-100 text-green-800 border border-green-300 rounded-lg flex items-center justify-between">
+          <div className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span>This summary has been updated based on your chat request.</span>
+          </div>
+          <button 
+            onClick={() => setIsUpdated(false)} 
+            className="text-green-700 hover:text-green-900"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      )}
+        
+      {hasCitations && (
+        <div className="mb-4 flex justify-end">
+          <div className="inline-flex rounded-md shadow-sm" role="group">
+            <button
+              type="button"
+              onClick={() => setCitationStyle('highlighted')}
+              className={`py-1 px-3 text-sm font-medium rounded-l-lg border ${
+                citationStyle === 'highlighted' 
+                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+              }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
+              Highlight Citations
+            </button>
+            <button
+              type="button"
+              onClick={() => setCitationStyle('normal')}
+              className={`py-1 px-3 text-sm font-medium border-t border-b ${
+                citationStyle === 'normal' 
+                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              Normal
+            </button>
+            <button
+              type="button"
+              onClick={() => setCitationStyle('hidden')}
+              className={`py-1 px-3 text-sm font-medium rounded-r-lg border ${
+                citationStyle === 'hidden' 
+                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              Hide Citations
             </button>
           </div>
-        )}
-          
-          {hasCitations && (
-            <div className="mb-4 flex justify-end">
-              <div className="inline-flex rounded-md shadow-sm" role="group">
-                <button
-                  type="button"
-                  onClick={() => setCitationStyle('highlighted')}
-                  className={`py-1 px-3 text-sm font-medium rounded-l-lg border ${
-                    citationStyle === 'highlighted' 
-                      ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                >
-                  Highlight Citations
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCitationStyle('normal')}
-                  className={`py-1 px-3 text-sm font-medium border-t border-b ${
-                    citationStyle === 'normal' 
-                      ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                >
-                  Normal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCitationStyle('hidden')}
-                  className={`py-1 px-3 text-sm font-medium rounded-r-lg border ${
-                    citationStyle === 'hidden' 
-                      ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                >
-                  Hide Citations
-                </button>
-              </div>
-            </div>
-          )}
-          
-          <article className="prose prose-lg prose-indigo max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeSanitize, rehypeKatex]}
-            >
-              {processedMarkdown}
-            </ReactMarkdown>
-            
-            {hasCitations && citationStyle === 'highlighted' && (
-              <div className="mt-4 text-sm text-gray-500 border-t pt-2">
-                <p>
-                  <span className="font-medium">Citations</span> are highlighted in the text in the format [Author, Year]. 
-                  These reference actual papers cited in the original research document.
-                </p>
-                <p className="mt-1">
-                  You can view the full references in the References section below.
-                </p>
-              </div>
-            )}
-          </article>
         </div>
+      )}
+      
+      <article className="prose prose-lg prose-indigo max-w-none">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeSanitize, rehypeKatex]}
+        >
+          {processedMarkdown}
+        </ReactMarkdown>
         
-        {/* Chat interface - always visible on desktop, responsive on mobile */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4">
-            <h3 className="text-lg font-semibold mb-3 text-indigo-700">Interactive Chat</h3>
-            <p className="text-sm mb-3 text-gray-600">
-              Ask me to modify or improve the summary according to your needs.
+        {hasCitations && citationStyle === 'highlighted' && (
+          <div className="mt-4 text-sm text-gray-500 border-t pt-2">
+            <p>
+              <span className="font-medium">Citations</span> are highlighted in the text in the format [Author, Year]. 
+              These reference actual papers cited in the original research document.
             </p>
-            <Chatbot 
-              summary={currentSummary}
-              references={references}
-              keywords={keywords}
-              onSummaryUpdate={handleSummaryUpdate}
-            />
+            <p className="mt-1">
+              You can view the full references in the References section below.
+            </p>
           </div>
-        </div>
-      </div>
+        )}
+      </article>
+    </div>
   );
 };
 
