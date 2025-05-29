@@ -1,12 +1,12 @@
 import fitz  # PyMuPDF
 import os
 import argparse
-from moviepy.editor import ImageSequenceClip
+#from moviepy.editor import ImageSequenceClip
 
 def extract_images(pdf_path, output_folder):
     os.makedirs(output_folder, exist_ok=True)
     doc = fitz.open(pdf_path)
-    
+    saved = []
 
     for page_number, page in enumerate(doc, start=1):
         image_list = page.get_images(full=True) #returns a tuple
@@ -26,8 +26,11 @@ def extract_images(pdf_path, output_folder):
             with open(image_path, "wb") as img_file:
                 img_file.write(image_bytes)
 
-            
+            saved.append(os.path.basename(image_path))
             print(f"Extracted {image_name}")
+    
+    
+    return saved
 
 def create_video_from_images(image_paths, output_video_path, fps=1):
 

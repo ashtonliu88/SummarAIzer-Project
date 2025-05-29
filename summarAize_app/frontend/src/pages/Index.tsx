@@ -28,6 +28,7 @@ interface Keyword {
 
 interface SummaryData {
   summary: string;
+  images: string[]; 
   references: string[];
   referenceCount?: number;
   relatedPapers: RelatedPaper[];
@@ -35,12 +36,16 @@ interface SummaryData {
   keywords?: Keyword[];
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
 const Index = () => {
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [includeCitations, setIncludeCitations] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('beginner');
+  const [summary, setSummary] = useState<string>('');
+  const [images, setImages]   = useState<string[]>([]);
 
   const handleProcess = async () => {
     if (!selectedFile) {
@@ -76,6 +81,7 @@ const Index = () => {
         // Make sure all required properties are present
         const summaryData: SummaryData = {
           summary: data.summary || "",
+          images: data.images || [],
           references: data.references || [],
           referenceCount: data.referenceCount || data.references?.length || 0,
           relatedPapers: data.relatedPapers || [],
@@ -113,7 +119,20 @@ const Index = () => {
             setSelectedFile={setSelectedFile}
             includeCitations={includeCitations}
             setIncludeCitations={setIncludeCitations}
+            onSummaryReady={(text, imgs) => { setSummary(text); setImages(imgs);}}
           />
+          {summaryData?.images.length > 0 && (
+            <section className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {summaryData.images.map((src) => (
+                <img
+                  key={src}
+                  src={`${API_BASE}${src}`}
+                  alt="Extracted from paper"
+                  className="rounded-lg border"
+                />
+              ))}
+            </section>
+          )}
           
           <DifficultySelector 
             selectedDifficulty={difficultyLevel}

@@ -171,11 +171,12 @@ class PdfSummarizer:
                         references_info.append(author_year)
             
             if references_info:
+                refs_text = "\n".join(references_info)
                 citation_instruction = f"""
                 Include relevant citations in the format [Author, Year] throughout the summary when referencing specific findings or claims.
                 
                 Here are some of the references from the paper - use these for accurate citations:
-                {'\n'.join(references_info)}
+                {refs_text}
                 
                 Make sure each citation actually relates to the claim it's supporting. Use the format [Author, Year] consistently with a comma between the author name and year.
                 Do not add emojis or extra characters in citations. Keep citations simple and academic.
