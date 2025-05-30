@@ -158,7 +158,9 @@ The summary should be comprehensive, well-structured, and maintain academic inte
 Your task is to answer questions based on the provided academic summary.
 Use the summary as your primary knowledge source, but you can reference citations if available.
 Give concise, accurate answers that directly address the user's question.
-DO NOT include the full summary in your responses. Focus only on answering the question based on the summary's content.
+IMPORTANT: DO NOT include the full summary or large chunks of it in your responses.
+DO NOT start your response with a summary or overview of the paper.
+Focus ONLY on answering the specific question using information from the summary.
 If the summary doesn't contain enough information to fully answer the question, acknowledge the limitations of your answer.
 """
             

@@ -6,7 +6,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from '@/components/ui/sonner';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, MessageCircle, ArrowRight, InfoIcon, Pencil } from "lucide-react";
+import { X, MessageCircle, ArrowRight, InfoIcon, Pencil, Save, BookmarkIcon } from "lucide-react";
+import { useAuth } from '@/contexts/AuthContext';
+import { libraryApi } from '@/services/api';
+import SaveSummaryDialog from './SaveSummaryDialog';
 
 // Add global CSS for the pulse animation
 const pulseStyle = `
@@ -44,8 +47,11 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
   keywords = [],
   onSummaryUpdate
 }) => {
+  const { currentUser } = useAuth();
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     { role: 'system', content: 'Hi! I can help you answer questions about the summary or update it. What would you like to do?' }
   ]);
@@ -209,6 +215,30 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
       setChatHistory(prev => [...prev, { role: 'system', content: modeMessage }]);
     }
   };
+  
+  // Save summary to user's library
+  const saveSummaryToLibrary = () => {
+    if (!currentUser) {
+      toast.error('Please log in to save summaries to your library');
+      return;
+    }
+    
+    setIsSaveDialogOpen(true);
+  };
+  
+  // Handle dialog close
+  const handleSaveDialogClose = () => {
+    setIsSaveDialogOpen(false);
+    
+    // Add system message about the save
+    setChatHistory(prev => [
+      ...prev, 
+      { 
+        role: 'system', 
+        content: '✅ Summary has been saved to your library!'
+      }
+    ]);
+  };
 
   // Render message bubbles with appropriate styling
   const renderMessages = () => {
@@ -289,6 +319,15 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
   return (
     // Use fixed with higher z-index and explicit bottom/left positioning
     <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: 9999 }}>
+      {/* Save Summary Dialog */}
+      <SaveSummaryDialog
+        isOpen={isSaveDialogOpen}
+        onClose={handleSaveDialogClose}
+        summary={currentSummary}
+        references={references}
+        keywords={keywords}
+      />
+      
       {isOpen ? (
         <Card className="w-80 md:w-96 shadow-xl border border-gray-300 rounded-xl">
           <CardHeader className="py-2 px-3 flex flex-row items-center justify-between">
@@ -318,6 +357,19 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
                 <Pencil size={12} />
                 <span className="hidden sm:inline">Update</span>
               </Button>
+              
+              {currentUser && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                  onClick={saveSummaryToLibrary}
+                  disabled={isSaving}
+                  title="Save to library"
+                >
+                  <BookmarkIcon size={14} />
+                </Button>
+              )}
               
               <Button 
                 variant="ghost" 
