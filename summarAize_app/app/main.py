@@ -148,3 +148,28 @@ async def chat_endpoint(request: ChatRequest):
             content={"error": str(e), "success": False},
             status_code=500
         )
+
+class QuestionRequest(BaseModel):
+    summary: str
+    user_question: str
+    chat_history: Optional[List[Dict[str, str]]] = None
+    references: Optional[List[str]] = None
+    keywords: Optional[List[str]] = None
+
+@app.post("/answer-question")
+async def answer_question_endpoint(request: QuestionRequest):
+    try:
+        result = chatbot.answer_question(
+            summary=request.summary,
+            user_question=request.user_question,
+            chat_history=request.chat_history,
+            references=request.references,
+            keywords=request.keywords
+        )
+        
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e), "success": False},
+            status_code=500
+        )
