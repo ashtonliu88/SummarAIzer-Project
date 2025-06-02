@@ -6,7 +6,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from '@/components/ui/sonner';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, MessageCircle, ArrowRight } from "lucide-react";
+import { X, MessageCircle, ArrowRight, InfoIcon, Pencil, Save, BookmarkIcon } from "lucide-react";
+import { useAuth } from '@/contexts/AuthContext';
+import { libraryApi } from '@/services/api';
+import SaveSummaryDialog from './SaveSummaryDialog';
 
 // Add global CSS for the pulse animation
 const pulseStyle = `
@@ -44,13 +47,17 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
   keywords = [],
   onSummaryUpdate
 }) => {
+  const { currentUser } = useAuth();
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    { role: 'system', content: 'Hi! I can help you update or customize the summary. What would you like me to do?' }
+    { role: 'system', content: 'Hi! I can help you answer questions about the summary or update it. What would you like to do?' }
   ]);
   const [currentSummary, setCurrentSummary] = useState(summary);
   const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState<'question' | 'update'>('question'); // Default mode is question-answering
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Add the pulse animation style to the document
@@ -85,25 +92,48 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/chat', {
+      // Detect if user is explicitly requesting to update the summary
+      const updateKeywords = ['update', 'modify', 'change', 'refine', 'revise', 'rewrite', 'edit', 'alter'];
+      const isUpdateRequest = updateKeywords.some(keyword => 
+        inputMessage.toLowerCase().includes(`${keyword} the summary`) || 
+        inputMessage.toLowerCase().includes(`${keyword} summary`) ||
+        inputMessage.toLowerCase().startsWith(keyword)
+      );
+      
+      // Set the mode based on the user's request
+      const currentMode = isUpdateRequest || mode === 'update' ? 'update' : 'question';
+      
+      // Use the appropriate endpoint based on the mode
+      const endpoint = currentMode === 'update' ? 'chat' : 'answer-question';
+      
+      // Prepare the request parameters based on the mode
+      const requestBody = {
+        summary: currentSummary,
+        chat_history: chatHistory.filter(msg => msg.role !== 'system'),
+        references: references,
+        keywords: keywords
+      };
+      
+      // Add the specific parameter for each endpoint
+      if (currentMode === 'update') {
+        Object.assign(requestBody, { user_message: inputMessage });
+      } else {
+        Object.assign(requestBody, { user_question: inputMessage });
+      }
+      
+      const response = await fetch(`http://127.0.0.1:8000/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          summary: currentSummary,
-          user_message: inputMessage,
-          chat_history: chatHistory.filter(msg => msg.role !== 'system'),
-          references: references,
-          keywords: keywords
-        })
+        body: JSON.stringify(requestBody)
       });
       
       const data = await response.json();
       
       if (data.success) {
-        // First update the summary if available
+        // First update the summary if available (only in update mode)
         let summaryWasUpdated = false;
         
-        if (data.refined_summary && data.refined_summary !== currentSummary) {
+        if (currentMode === 'update' && data.refined_summary && data.refined_summary !== currentSummary) {
           setCurrentSummary(data.refined_summary);
           onSummaryUpdate(data.refined_summary);
           summaryWasUpdated = true;
@@ -165,10 +195,49 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
   // Reset the chat
   const resetChat = () => {
     setChatHistory([
-      { role: 'system', content: 'Hi! I can help you update or customize the summary. What would you like me to do?' }
+      { role: 'system', content: 'Hi! I can help you answer questions about the summary or update it. What would you like to do?' }
     ]);
     setCurrentSummary(summary); // Reset to original summary
     onSummaryUpdate(summary);
+    setMode('question'); // Reset to question mode
+  };
+  
+  // Switch mode between question answering and summary updating
+  const switchMode = (newMode: 'question' | 'update') => {
+    if (mode !== newMode) {
+      setMode(newMode);
+      
+      // Add a system message indicating the mode change
+      const modeMessage = newMode === 'question' 
+        ? 'Switched to question-answering mode. Ask me anything about the summary!' 
+        : 'Switched to summary update mode. Let me know how you\'d like to modify the summary.';
+      
+      setChatHistory(prev => [...prev, { role: 'system', content: modeMessage }]);
+    }
+  };
+  
+  // Save summary to user's library
+  const saveSummaryToLibrary = () => {
+    if (!currentUser) {
+      toast.error('Please log in to save summaries to your library');
+      return;
+    }
+    
+    setIsSaveDialogOpen(true);
+  };
+  
+  // Handle dialog close
+  const handleSaveDialogClose = () => {
+    setIsSaveDialogOpen(false);
+    
+    // Add system message about the save
+    setChatHistory(prev => [
+      ...prev, 
+      { 
+        role: 'system', 
+        content: '✅ Summary has been saved to your library!'
+      }
+    ]);
   };
 
   // Render message bubbles with appropriate styling
@@ -196,6 +265,16 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
           return (
             <div key={index} className="flex justify-center mb-2">
               <div className="py-1 px-2 rounded-md bg-green-100 text-green-800 border border-green-200 text-center text-xs">
+                {message.content}
+              </div>
+            </div>
+          );
+        }
+        // For mode switch messages
+        else if (message.content.includes('Switched to')) {
+          return (
+            <div key={index} className="flex justify-center mb-2">
+              <div className="py-1 px-2 rounded-md bg-blue-50 text-blue-800 border border-blue-100 text-center text-xs">
                 {message.content}
               </div>
             </div>
@@ -240,6 +319,15 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
   return (
     // Use fixed with higher z-index and explicit bottom/left positioning
     <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: 9999 }}>
+      {/* Save Summary Dialog */}
+      <SaveSummaryDialog
+        isOpen={isSaveDialogOpen}
+        onClose={handleSaveDialogClose}
+        summary={currentSummary}
+        references={references}
+        keywords={keywords}
+      />
+      
       {isOpen ? (
         <Card className="w-80 md:w-96 shadow-xl border border-gray-300 rounded-xl">
           <CardHeader className="py-2 px-3 flex flex-row items-center justify-between">
@@ -248,11 +336,47 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
               Summary Assistant
             </CardTitle>
             <div className="flex gap-1">
+              {/* Mode toggle buttons */}
+              <Button 
+                variant={mode === 'question' ? "secondary" : "ghost"}
+                size="sm" 
+                className="h-6 text-xs px-2 flex items-center gap-1"
+                onClick={() => switchMode('question')}
+                title="Question answering mode"
+              >
+                <InfoIcon size={12} />
+                <span className="hidden sm:inline">Q&A</span>
+              </Button>
+              <Button 
+                variant={mode === 'update' ? "secondary" : "ghost"}
+                size="sm" 
+                className="h-6 text-xs px-2 flex items-center gap-1"
+                onClick={() => switchMode('update')}
+                title="Summary update mode"
+              >
+                <Pencil size={12} />
+                <span className="hidden sm:inline">Update</span>
+              </Button>
+              
+              {currentUser && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                  onClick={saveSummaryToLibrary}
+                  disabled={isSaving}
+                  title="Save to library"
+                >
+                  <BookmarkIcon size={14} />
+                </Button>
+              )}
+              
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="h-6 w-6 text-gray-500 hover:text-gray-700"
                 onClick={resetChat}
+                title="Reset conversation"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -284,7 +408,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({
               <Input
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Type your request..."
+                placeholder={mode === 'question' ? "Ask a question about the summary..." : "How would you like to update the summary?"}
                 disabled={isLoading}
                 className="flex-grow text-sm h-8"
               />

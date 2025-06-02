@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,6 +10,7 @@ from textSummarize import PdfSummarizer
 from chatbot import SummaryRefiner
 import requests
 from routers import align_router
+from auth import get_current_user, UserInfo
 
 
 app = FastAPI()
@@ -41,7 +42,8 @@ class AudioRequest(BaseModel):
 async def summarize_pdf_endpoint(
     file: UploadFile = File(...),
     detailed: str = Form("false"),
-    citations: str = Form("false")
+    citations: str = Form("false"),
+    current_user: Optional[UserInfo] = None  # Made optional to allow anonymous usage
 ):
     try:
         # Convert string values to booleans
@@ -148,3 +150,119 @@ async def chat_endpoint(request: ChatRequest):
             content={"error": str(e), "success": False},
             status_code=500
         )
+
+class QuestionRequest(BaseModel):
+    summary: str
+    user_question: str
+    chat_history: Optional[List[Dict[str, str]]] = None
+    references: Optional[List[str]] = None
+    keywords: Optional[List[str]] = None
+
+@app.post("/answer-question")
+async def answer_question_endpoint(request: QuestionRequest):
+    try:
+        result = chatbot.answer_question(
+            summary=request.summary,
+            user_question=request.user_question,
+            chat_history=request.chat_history,
+            references=request.references,
+            keywords=request.keywords
+        )
+        
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e), "success": False},
+            status_code=500
+        )
+
+# User authentication endpoints
+@app.get("/auth/me")
+async def get_user_info(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Get the current authenticated user information.
+    """
+    return current_user
+
+class UserPreference(BaseModel):
+    """User preferences model"""
+    difficulty_level: Optional[str] = None
+    include_citations: Optional[bool] = None
+    theme: Optional[str] = None
+
+@app.post("/auth/preferences")
+async def update_user_preferences(
+    preferences: UserPreference,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Update user preferences. In a production environment, these would be stored in a database.
+    """
+    # In a real implementation, we would store these preferences in a database
+    # For now, we'll just return them back
+    return {
+        "user_id": current_user.uid,
+        "preferences": preferences.dict(),
+        "success": True
+    }
+
+@app.get("/auth/verify-token")
+async def verify_token_endpoint(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Verify if the user's token is valid
+    """
+    return {"valid": True, "user": current_user}
+
+# User library endpoints
+class SavedSummary(BaseModel):
+    """Model for saved summary metadata"""
+    id: str
+    title: str
+    date_created: str
+    summary: str
+    references: Optional[List[str]] = None
+    keywords: Optional[List[str]] = None
+
+@app.get("/user/library")
+async def get_user_library(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Get user's saved summaries. In a production environment, these would be retrieved from a database.
+    """
+    # In a real implementation, we would fetch the user's library from a database
+    # For now, we'll just return an empty array or mock data
+    
+    # Sample mock data for demonstration purposes
+    mock_library = [
+        {
+            "id": "1",
+            "title": "Artificial Intelligence in Healthcare",
+            "date_created": "2025-05-25T10:30:00Z",
+            "summary_preview": "AI is revolutionizing healthcare by improving diagnostics...",
+        },
+        {
+            "id": "2",
+            "title": "Climate Change Impact on Marine Ecosystems",
+            "date_created": "2025-05-20T14:45:00Z",
+            "summary_preview": "Rising ocean temperatures are causing significant disruptions...",
+        }
+    ]
+    
+    return {
+        "user_id": current_user.uid,
+        "summaries": mock_library
+    }
+
+@app.post("/user/library")
+async def save_to_library(
+    summary: SavedSummary,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Save a summary to the user's library. In a production environment, this would be stored in a database.
+    """
+    # In a real implementation, we would store this in a database
+    return {
+        "success": True,
+        "summary_id": summary.id,
+        "message": "Summary saved to library"
+    }
