@@ -1,3 +1,4 @@
+numpy<1.23
 annotated-types==0.7.0
 anyio==4.9.0
 certifi==2025.1.31
@@ -8,6 +9,7 @@ dotenv==0.9.9
 exceptiongroup==1.2.2
 fastapi==0.115.12
 gtts==2.5.1
+firebase-admin==6.5.0
 h11==0.14.0
 httpcore==1.0.8
 httpx==0.28.1

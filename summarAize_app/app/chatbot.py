@@ -120,6 +120,100 @@ The summary should be comprehensive, well-structured, and maintain academic inte
                 "success": False
             }
     
+    def answer_question(self, 
+                      summary: str, 
+                      user_question: str,
+                      chat_history: Optional[List[Dict[str, str]]] = None,
+                      references: Optional[List[str]] = None,
+                      keywords: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Answer a question about the summary without modifying it.
+        
+        Args:
+            summary: The summary text
+            user_question: User's question about the summary
+            chat_history: Previous chat exchanges
+            references: List of references from the paper
+            keywords: List of keywords from the paper
+            
+        Returns:
+            Dictionary with the answer and chat history
+        """
+        if not self.client:
+            return {
+                "error": "OpenAI API key not configured",
+                "chat_history": chat_history or []
+            }
+        
+        try:
+            # Initialize chat history if None
+            if chat_history is None:
+                chat_history = []
+            
+            # Add the user's new message to history
+            chat_history.append({"role": "user", "content": user_question})
+            
+            # Create system message for Q&A mode
+            qa_system_msg = """You are an expert academic assistant who answers questions about research papers.
+Your task is to answer questions based on the provided academic summary.
+Use the summary as your primary knowledge source, but you can reference citations if available.
+Give concise, accurate answers that directly address the user's question.
+IMPORTANT: DO NOT include the full summary or large chunks of it in your responses.
+DO NOT start your response with a summary or overview of the paper.
+Focus ONLY on answering the specific question using information from the summary.
+If the summary doesn't contain enough information to fully answer the question, acknowledge the limitations of your answer.
+"""
+            
+            qa_messages = [
+                {"role": "system", "content": qa_system_msg},
+                {"role": "system", "content": f"Summary of the research paper: {summary}"}
+            ]
+            
+            # Add references context if available
+            if references and len(references) > 0:
+                references_text = "\n".join(references)
+                qa_messages.append({"role": "system", "content": f"References:\n{references_text}"})
+                
+            # Add keywords context if available
+            if keywords and len(keywords) > 0:
+                keywords_text = ", ".join(keywords[:10])  # Limit to first 10
+                qa_messages.append({"role": "system", "content": f"Keywords: {keywords_text}"})
+            
+            # Add the user question
+            qa_messages.append({"role": "user", "content": user_question})
+            
+            # Add chat history (limited to last 6 exchanges to save tokens)
+            for msg in chat_history[-6:]:
+                if msg["role"] != "user" or msg["content"] != user_question:  # Avoid duplication
+                    qa_messages.append(msg)
+            
+            # Call OpenAI API to get the answer
+            qa_response = self.client.chat.completions.create(
+                model="gpt-4-turbo",
+                messages=qa_messages,
+                temperature=0.7,
+                max_tokens=800
+            )
+            
+            # Extract the answer
+            answer_text = qa_response.choices[0].message.content.strip()
+            
+            # Add assistant response to history
+            chat_history.append({"role": "assistant", "content": answer_text})
+            
+            return {
+                "chat_history": chat_history,
+                "success": True
+            }
+        
+        except Exception as e:
+            print(f"Error answering question: {e}")
+            return {
+                "error": str(e),
+                "chat_history": chat_history,
+                "success": False
+            }
+    
     def _create_system_message(self, references=None, keywords=None) -> str:
         """
         Create a detailed system message with context for the refinement.

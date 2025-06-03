@@ -1,25 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth } from '@/config/firebase-config';
-import { signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Navbar = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, []);
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await logout();
       navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -49,10 +39,10 @@ const Navbar = () => {
             My Library
           </Link>
           
-          {user ? (
+          {currentUser ? (
             <div className="flex items-center space-x-4">
               <span className="text-white text-sm truncate max-w-[150px]">
-                {user.email}
+                {currentUser.email}
               </span>
               <Button 
                 onClick={handleLogout}

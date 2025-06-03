@@ -171,12 +171,13 @@ class PdfSummarizer:
                         references_info.append(author_year)
             
             if references_info:
-                refs_text = "\n".join(references_info)
+                # Define newline character outside the f-string to avoid backslash in expression
+                newline = '\n'
                 citation_instruction = f"""
                 Include relevant citations in the format [Author, Year] throughout the summary when referencing specific findings or claims.
                 
                 Here are some of the references from the paper - use these for accurate citations:
-                {refs_text}
+                {newline.join(references_info)}
                 
                 Make sure each citation actually relates to the claim it's supporting. Use the format [Author, Year] consistently with a comma between the author name and year.
                 Do not add emojis or extra characters in citations. Keep citations simple and academic.
@@ -248,13 +249,10 @@ class PdfSummarizer:
         token_count = len(tokens)
         print(f"Extracted {token_count:,} tokens from PDF")
         
-        # If we need citations, extract references first
-        if include_citations:
-            print("Extracting references for citations...")
-            self.extracted_references = self.extract_references(text)
-            print(f"Found {len(self.extracted_references)} references")
-        else:
-            self.extracted_references = []
+        # Always extract references regardless of citation setting
+        print("Extracting references...")
+        self.extracted_references = self.extract_references(text)
+        print(f"Found {len(self.extracted_references)} references")
         
         #split chunks
         print(f"Splitting text into chunks using {chunk_method}-based chunking...")
@@ -284,6 +282,9 @@ class PdfSummarizer:
         print("Compiling final summary...")
         final_summary = self.compile_summary(chunk_summaries, detailed, include_citations)
         
+        # References are extracted and stored in self.extracted_references but not added to summary
+        # They can be accessed separately if needed
+        
         #save to file
         if output_path:
             with open(output_path, 'w', encoding='utf-8') as f:
@@ -294,41 +295,246 @@ class PdfSummarizer:
 
     def extract_references(self, text):
         """
-        Extract references from the text using a regex pattern or sending to OpenAI
+        Extract references from the text using multiple strategies
         Returns a list of reference strings
         """
+        print("Starting reference extraction...")
+        
         try:
-            # First try to find a references section
-            references_section = re.search(r'(?:References|Bibliography|Works Cited)(?:\s*\n)+([\s\S]+?)(?:\n\s*\n|\Z)', text, re.IGNORECASE)
+            # Strategy 1: Find references section with comprehensive header patterns
+            reference_patterns = [
+                r'(?:^|\n)(?:REFERENCES?|Bibliography|Works?\s+Cited|Literature\s+Cited|Citations?)\s*\n([\s\S]+?)(?:\n\s*(?:APPENDIX|Appendix|SUPPLEMENT|Supplement|ACKNOWLEDGMENT|Acknowledgment|AUTHOR|Author|AFFILIATION|Affiliation|FIGURE|Figure|TABLE|Table)|\Z)',
+                r'(?:^|\n)(?:REFERENCES?|Bibliography|Works?\s+Cited|Literature\s+Cited|Citations?)\s*\n([\s\S]+?)(?:\n\s*\n\s*[A-Z][A-Z\s]+\n|\Z)',
+                r'(?:^|\n)(?:REFERENCES?|Bibliography|Works?\s+Cited|Literature\s+Cited|Citations?)\s*\n([\s\S]+?)(?:\n\s*\n|\Z)'
+            ]
             
-            if references_section:
-                # If references section is found, extract references
-                raw_references = references_section.group(1)
-                # Split by common reference patterns (numbered or author patterns)
-                ref_items = re.split(r'(?:\[\d+\]|\d+\.|^\s*[A-Z][a-zA-Z,\.\s&]+?\s*\(\d{4}\))', raw_references)
-                # Clean up and filter empty items
-                references = [ref.strip() for ref in ref_items if ref.strip()]
-                
-                if references:
+            references_text = None
+            for pattern in reference_patterns:
+                match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    references_text = match.group(1).strip()
+                    print(f"Found references section using pattern match (length: {len(references_text)} chars)")
+                    break
+            
+            if references_text:
+                # Strategy 2: Parse the references section using multiple approaches
+                references = self._parse_references_section(references_text)
+                if references and len(references) >= 1:  # Accept even single references
+                    print(f"Successfully extracted {len(references)} references using pattern parsing")
                     return references
             
-            # If simple extraction fails, use OpenAI to extract references
-            prompt = f"Extract all references from the following text. Format each reference on a new line, do not number them:\n\n{text[-20000:]}"
+            # Strategy 3: Look for numbered reference patterns throughout the text
+            numbered_refs = self._extract_numbered_references(text)
+            if numbered_refs and len(numbered_refs) >= 1:
+                print(f"Successfully extracted {len(numbered_refs)} numbered references")
+                return numbered_refs
             
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": "You are a reference extraction assistant."},
-                         {"role": "user", "content": prompt}],
-                max_tokens=1000,
-                temperature=0.3
-            )
+            # Strategy 4: AI-powered extraction with specific reference section focus
+            if references_text:  # Only if we found a references section
+                ai_refs = self._ai_extract_references(references_text)
+                if ai_refs and len(ai_refs) >= 1:
+                    print(f"Successfully extracted {len(ai_refs)} references using AI parsing")
+                    return ai_refs
             
-            extracted_refs = response.choices[0].message.content.strip().split('\n')
-            return [ref.strip() for ref in extracted_refs if ref.strip()]
+            # Strategy 5: Look for in-text citations as last resort
+            citations = self._extract_in_text_citations(text)
+            if citations:
+                print(f"Found {len(citations)} in-text citations (no reference list found)")
+                return [f"This document contains {len(citations)} in-text citations but no complete reference list was found."]
+            
+            print("No references found in document")
+            return ["No references were found in this document."]
             
         except Exception as e:
             print(f"Error extracting references: {e}")
+            return [f"Error occurred while extracting references: {str(e)}"]
+
+    def _parse_references_section(self, references_text):
+        """Parse a references section using multiple splitting strategies"""
+        references = []
+        
+        # Clean up the text
+        clean_text = re.sub(r'\n+', '\n', references_text.strip())
+        
+        # Strategy 1: Split by year patterns - most reliable since every reference should have a year
+        # Split after year patterns like "2020." or "(2020)." or "2020)" etc.
+        year_patterns = [
+            r'((?:19|20)\d{2}[a-z]?\.)\s*\n',  # "2020." followed by newline
+            r'(\((?:19|20)\d{2}[a-z]?\)\.)\s*\n',  # "(2020)." followed by newline  
+            r'(\((?:19|20)\d{2}[a-z]?\))\s*\n',  # "(2020)" followed by newline
+            r'((?:19|20)\d{2}[a-z]?)\.\s*\n',  # "2020." (with period after) followed by newline
+        ]
+        
+        for pattern in year_patterns:
+            parts = re.split(pattern, clean_text)
+            if len(parts) > 2:  # Need at least 3 parts (text, delimiter, text)
+                # Reconstruct references by combining text with their delimiters
+                reconstructed_refs = []
+                for i in range(0, len(parts) - 1, 2):
+                    if i + 1 < len(parts):
+                        ref_text = parts[i] + (parts[i + 1] if i + 1 < len(parts) else "")
+                        if ref_text.strip() and len(ref_text.strip()) > 10:
+                            reconstructed_refs.append(ref_text.strip())
+                
+                if len(reconstructed_refs) >= 1:
+                    references.extend(reconstructed_refs)
+                    break  # Found references, use this pattern
+        
+        # Strategy 2: Split by numbered patterns [1], [2] or 1., 2. (if year splitting didn't work)
+        if not references:
+            numbered_pattern = r'\n(?=\s*(?:\[\d+\]|\d+\.)\s*[A-Z])'
+            parts = re.split(numbered_pattern, clean_text)
+            if len(parts) > 1:
+                refs = [part.strip() for part in parts if part.strip() and len(part.strip()) > 10]
+                if len(refs) >= 1:
+                    references.extend(refs)
+        
+        # Strategy 3: Split by author patterns (Last, F. or Last, F. M.)
+        if not references:
+            author_pattern = r'\n(?=\s*[A-Z][a-z]+,\s+[A-Z]\.(?:\s+[A-Z]\.)?(?:\s+[A-Z]\.)*\s+(?:\(\d{4}\)|[\"\']|[A-Z]))'
+            parts = re.split(author_pattern, clean_text)
+            if len(parts) > 1:
+                refs = [part.strip() for part in parts if part.strip() and len(part.strip()) > 10]
+                if len(refs) >= 1:
+                    references.extend(refs)
+        
+        # Strategy 4: Line-by-line parsing for complex formats
+        if not references:
+            lines = clean_text.split('\n')
+            current_ref = ""
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Check if this line starts a new reference
+                if (re.match(r'^\s*(?:\[\d+\]|\d+\.)\s*[A-Z]', line) or 
+                    re.match(r'^\s*[A-Z][a-z]+,\s+[A-Z]\.', line)):
+                    if current_ref and len(current_ref) > 10:
+                        references.append(current_ref.strip())
+                    current_ref = line
+                else:
+                    current_ref += " " + line if current_ref else line
+            
+            # Add the last reference
+            if current_ref and len(current_ref) > 10:
+                references.append(current_ref.strip())
+        
+        # Strategy 5: If still no references, try the most aggressive approach
+        if not references:
+            # Split by any pattern that looks like a year ending
+            aggressive_pattern = r'(?<=(?:19|20)\d{2}[a-z]?[\.\)])\s*\n(?=\s*[A-Z])'
+            parts = re.split(aggressive_pattern, clean_text)
+            if len(parts) > 1:
+                refs = [part.strip() for part in parts if part.strip() and len(part.strip()) > 5]
+                if len(refs) >= 1:
+                    references.extend(refs)
+        
+        # Remove duplicates and clean up
+        unique_refs = []
+        seen = set()
+        for ref in references:
+            # Clean up reference but keep it mostly intact
+            ref_clean = re.sub(r'^\s*(?:\[\d+\]|\d+\.)\s*', '', ref).strip()
+            if ref_clean and ref_clean not in seen and len(ref_clean) > 5:
+                seen.add(ref_clean)
+                unique_refs.append(ref_clean)
+        
+        print(f"Extracted {len(unique_refs)} unique references from references section")
+        return unique_refs[:100]  # Limit to 100 references max
+
+    def _extract_numbered_references(self, text):
+        """Extract numbered references from anywhere in the text"""
+        references = []
+        
+        # Look for patterns like [1] Author, Title...
+        pattern = r'\[(\d+)\]\s*([A-Z][^\[\]]+?)(?=\s*\[\d+\]|\s*$|\n\s*\n)'
+        matches = re.findall(pattern, text, re.DOTALL)
+        
+        if matches:
+            for num, ref_text in matches:
+                clean_ref = re.sub(r'\s+', ' ', ref_text.strip())
+                if len(clean_ref) > 5:  # Reduced from 20 to 5
+                    references.append(clean_ref)
+        
+        return references
+
+    def _ai_extract_references(self, references_text):
+        """Use AI to extract references from a specific references section"""
+        try:
+            # Limit text to avoid token limits
+            limited_text = references_text[:8000]  # Much more focused than before
+            
+            prompt = f"""You are extracting references from an academic paper's reference section. 
+Extract EVERY reference listed in this section, no matter how short or long. Each reference should be on a separate line.
+Do NOT create or invent references. Only extract what is actually written in the text.
+Remove any numbering (like [1], 1., etc.) from the beginning of each reference.
+
+Reference section text:
+{limited_text}
+
+Instructions:
+- Extract ALL references, including short ones
+- Remove reference numbers/bullets from the start of each line
+- One reference per line
+- Include incomplete references if they exist in the original text
+- Do not add any references not in the original text
+- If no clear references are found, respond with: "No clear references found"
+- Include URLs, DOIs, and web references if present
+- Extract conference proceedings, books, journal articles, and any other citation types
+"""
+            
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a precise reference extraction assistant. Only extract actual references from the provided text."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1500,
+                temperature=0.1  # Very low temperature for precision
+            )
+            
+            result = response.choices[0].message.content.strip()
+            
+            if "No clear references found" in result:
+                return []
+            
+            # Split by lines and clean up
+            refs = [ref.strip() for ref in result.split('\n') if ref.strip()]
+            # Filter out obviously bad references with less restrictive validation
+            valid_refs = []
+            for ref in refs:
+                # Much more permissive validation - just basic quality checks
+                if (len(ref) > 5 and  # Much shorter minimum length
+                    not ref.lower().startswith('no references') and
+                    not ref.lower().startswith('note:') and
+                    not ref.lower().startswith('here are') and
+                    not ref.lower().startswith('the references') and
+                    # Accept any reference that has basic structure (letters and some punctuation)
+                    (any(char.isalpha() for char in ref) and 
+                     any(char in ref for char in '.,;:'))):  # Basic punctuation check
+                    valid_refs.append(ref)
+            
+            return valid_refs[:50]  # Increased limit to 50 references
+            
+        except Exception as e:
+            print(f"AI extraction error: {e}")
             return []
+
+    def _extract_in_text_citations(self, text):
+        """Extract in-text citations as a last resort"""
+        citation_patterns = [
+            r'\([A-Z][a-z]+(?:\s+et\s+al\.?)?,?\s+\d{4}[a-z]?\)',  # (Author, 2020)
+            r'\([A-Z][a-z]+(?:\s+&\s+[A-Z][a-z]+)?,?\s+\d{4}[a-z]?\)',  # (Author & Author, 2020)
+            r'\[[A-Z][a-z]+(?:\s+et\s+al\.?)?,?\s+\d{4}[a-z]?\]'   # [Author, 2020]
+        ]
+        
+        citations = set()
+        for pattern in citation_patterns:
+            matches = re.findall(pattern, text)
+            citations.update(matches)
+        
+        return list(citations)[:20]  # Limit to 20 citations
             
     def extract_keywords(self, text):
         """
@@ -411,6 +617,37 @@ class PdfSummarizer:
             print(f"Error extracting author/year: {e}")
         
         return None
+
+    def _format_references_section(self):
+        """
+        Format the extracted references into a readable section for the summary
+        Returns a formatted string with the references section
+        """
+        if not hasattr(self, 'extracted_references') or not self.extracted_references:
+            return ""
+        
+        formatted_section = "## References\n\n"
+        
+        # Check if references are just error messages or empty
+        if (len(self.extracted_references) == 1 and 
+            ("No references" in self.extracted_references[0] or 
+             "Error occurred" in self.extracted_references[0] or
+             "citations but no complete reference list" in self.extracted_references[0])):
+            formatted_section += self.extracted_references[0]
+            return formatted_section
+        
+        # Format each reference with numbering
+        for i, reference in enumerate(self.extracted_references, 1):
+            # Clean up the reference text
+            clean_ref = reference.strip()
+            
+            # Remove any existing numbering at the start
+            clean_ref = re.sub(r'^\s*(?:\[\d+\]|\d+\.)\s*', '', clean_ref)
+            
+            # Add our own numbering
+            formatted_section += f"{i}. {clean_ref}\n\n"
+        
+        return formatted_section.rstrip()
 
 def main():
     parser = argparse.ArgumentParser(description='Summarize a research paper PDF using OpenAI')
