@@ -83,11 +83,28 @@ def extract_visual_elements(pdf_path, output_folder="extracted_visuals"):
                         best = candidates[0]
                         print(f"    → Selected {best['type']} bbox: {best['bbox']} (area {best['area']})")
 
-                        cropped = page.crop(best['bbox']).to_image(resolution=300)
-                        fname = f"page{page_num+1}_{clean_caption_text(text)}.png"
-                        path = os.path.join(output_folder, fname)
-                        cropped.save(path)
-                        print(f"[✓] Saved: {fname}")
+                        # Validate and clean bbox coordinates
+                        bbox = best['bbox']
+                        x0, y0, x1, y1 = bbox
+                        
+                        # Ensure coordinates are non-negative and within reasonable bounds
+                        x0 = max(0, x0)
+                        y0 = max(0, y0)
+                        x1 = max(x0 + 1, x1)  # Ensure x1 > x0
+                        y1 = max(y0 + 1, y1)  # Ensure y1 > y0
+                        
+                        clean_bbox = (x0, y0, x1, y1)
+                        print(f"    → Cleaned bbox: {clean_bbox}")
+
+                        try:
+                            cropped = page.crop(clean_bbox).to_image(resolution=300)
+                            fname = f"page{page_num+1}_{clean_caption_text(text)}.png"
+                            path = os.path.join(output_folder, fname)
+                            cropped.save(path)
+                            print(f"[✓] Saved: {fname}")
+                        except Exception as crop_error:
+                            print(f"    [!] Error cropping image: {crop_error}")
+                            continue
                     else:
                         print("    [!] No nearby image/rect found — skipping.")
 

@@ -1,20 +1,23 @@
 from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, Body, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from typing import List, Dict, Optional
 from pydantic import BaseModel
+from pathlib import Path
 import os, uuid, pathlib
 from gtts import gTTS
 from textSummarize import PdfSummarizer
 from extractVisuals import extract_visual_elements, generate_visuals_video
+from imageExtract import extract_images
 from chatbot import SummaryRefiner
 import requests
 from auth import get_current_user, UserInfo
 
 from services.aligner import align
-from services.related import get_related_papers
-from pydantic import BaseModel
+# from services.related import get_related_papers
 import re
 
 
@@ -40,6 +43,9 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 IMAGE_FOLDER  = Path("images")
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
+
+VIDEO_FOLDER = Path("videos")
+os.makedirs(VIDEO_FOLDER, exist_ok=True)
 
 app.mount("/images", StaticFiles(directory=IMAGE_FOLDER),name="images")
 class AudioRequest(BaseModel):
@@ -90,7 +96,7 @@ async def summarize_pdf_endpoint(
         )
 
         #extracting images
-        image_files = extract_images(str(pdf_path), str(IMAGE_FOLDER))
+        image_files = extract_images(str(file_path), str(IMAGE_FOLDER))
         image_urls = [f"/images/{name}" for name in image_files]
         
         # Extract keywords & references from cleaned text
@@ -147,13 +153,21 @@ async def generate_visuals_video_endpoint(file: UploadFile = File(...)):
         visuals_folder = VIDEO_FOLDER / f"{pdf_id}_visuals"
         visuals_folder.mkdir(exist_ok=True)
 
-        extract_visual_elements(str(pdf_path), str(visuals_folder))
+        try:
+            extract_visual_elements(str(pdf_path), str(visuals_folder))
+        except Exception as extract_error:
+            print(f"[!] Error extracting visuals: {extract_error}")
+            return JSONResponse(content={"error": f"Failed to extract visuals: {str(extract_error)}"}, status_code=500)
 
         # Generate video
         video_filename = f"{pdf_id}_walkthrough.mp4"
         video_path = VIDEO_FOLDER / video_filename
 
-        generate_visuals_video(str(visuals_folder), str(video_path))
+        try:
+            generate_visuals_video(str(visuals_folder), str(video_path))
+        except Exception as video_error:
+            print(f"[!] Error generating video: {video_error}")
+            return JSONResponse(content={"error": f"Failed to generate video: {str(video_error)}"}, status_code=500)
 
         print(f"[✓] Video generated: {video_path}")
 
@@ -163,6 +177,7 @@ async def generate_visuals_video_endpoint(file: UploadFile = File(...)):
         }
 
     except Exception as e:
+        print(f"[!] Error in /generate-visuals-video: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
     
 @app.get("/video/{filename}")

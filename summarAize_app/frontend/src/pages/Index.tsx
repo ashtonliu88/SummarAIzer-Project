@@ -49,7 +49,9 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('beginner');
   const [summary, setSummary] = useState<string>('');
-  const [images, setImages]   = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string>('');
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
 
   const handleProcess = async () => {
     if (!selectedFile) {
@@ -96,22 +98,32 @@ const Index = () => {
     
         // Now generate video!
         if (selectedFile) {
+          setIsGeneratingVideo(true);
           toast("Generating visuals video...");
-          const videoFormData = new FormData();
-          videoFormData.append("file", selectedFile);
+          
+          try {
+            const videoFormData = new FormData();
+            videoFormData.append("file", selectedFile);
     
-          const videoResponse = await fetch(`${API}/generate-visuals-video`, {
-            method: "POST",
-            body: videoFormData,
-          });
+            const videoResponse = await fetch(`${API}/generate-visuals-video`, {
+              method: "POST",
+              body: videoFormData,
+            });
     
-          const videoData = await videoResponse.json();
+            const videoData = await videoResponse.json();
     
-          if (videoResponse.ok && videoData.video_url) {
-            setVideoUrl(`${API}${videoData.video_url}`);
-            toast.success("Video Ready!");
-          } else {
-            toast.error(`Video generation failed: ${videoData.error}`);
+            if (videoResponse.ok && videoData.video_url) {
+              setVideoUrl(`${API}${videoData.video_url}`);
+              toast.success("Video Ready!");
+            } else {
+              console.error("Video generation error:", videoData.error);
+              toast.error(`Video generation failed: ${videoData.error || 'Unknown error'}`);
+            }
+          } catch (videoError) {
+            console.error("Video generation network error:", videoError);
+            toast.error("Failed to generate video - network error");
+          } finally {
+            setIsGeneratingVideo(false);
           }
         }
     
@@ -145,6 +157,11 @@ const Index = () => {
               setSelectedFile={setSelectedFile}
               includeCitations={includeCitations}
               setIncludeCitations={setIncludeCitations}
+              onSummaryReady={(summary, images) => {
+                // This is a fallback, but we primarily use DifficultySelector's onProcess
+                setSummary(summary);
+                setImages(images);
+              }}
             />
             
             <DifficultySelector 

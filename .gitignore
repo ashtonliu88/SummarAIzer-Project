@@ -10,6 +10,11 @@
 *.mp3
 *.wav
 *.ogg
+*.png
+*.mp4
+*.txt
+*.pdf
+*.jpeg
 
 # Python cache files
 __pycache__/
