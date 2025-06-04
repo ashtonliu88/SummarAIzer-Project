@@ -7,10 +7,15 @@ from pydantic import BaseModel
 import os, uuid, pathlib
 from gtts import gTTS
 from textSummarize import PdfSummarizer
+from extractVisuals import extract_visual_elements, generate_visuals_video
 from chatbot import SummaryRefiner
 import requests
-from routers import align_router
 from auth import get_current_user, UserInfo
+
+from services.aligner import align
+from services.related import get_related_papers
+from pydantic import BaseModel
+import re
 
 
 app = FastAPI()
@@ -41,6 +46,20 @@ class AudioRequest(BaseModel):
     summary: Optional[str] = None
     text_name: Optional[str] = None
 
+def clean_pdf_text(text: str) -> str:
+    # Remove page numbers like "\n12\n" or "12\n" or "\n12"
+    text = re.sub(r'\n\d+\n', '\n', text)
+    text = re.sub(r'\n\d+\s', '\n', text)
+    text = re.sub(r'\s\d+\n', '\n', text)
+
+    # Remove stray control characters
+    text = re.sub(r'[\x00-\x1F\x7F]', '', text)
+
+    # Normalize multiple spaces/newlines
+    text = re.sub(r'\s+', ' ', text)
+
+    return text
+
 
 @app.post("/summarize")
 async def summarize_pdf_endpoint(
@@ -61,7 +80,7 @@ async def summarize_pdf_endpoint(
         with open(file_path, 'wb') as f:
             f.write(await file.read())
         
-        # Process the PDF
+        # Process the PDF to generate summary
         summary = summarizer.summarize_pdf(
             file_path, 
             chunk_method="sentence",
@@ -74,18 +93,23 @@ async def summarize_pdf_endpoint(
         image_files = extract_images(str(pdf_path), str(IMAGE_FOLDER))
         image_urls = [f"/images/{name}" for name in image_files]
         
-        # Extract keywords if available
+        # Extract keywords & references from cleaned text
         keywords = []
+        references = []
+
         try:
-            # Read the file again since it might have been processed
             with open(file_path, 'rb') as f:
-                text = summarizer.extract_text_from_pdf(file_path)
-                keywords = summarizer.extract_keywords(text)
-        except Exception as e:
-            print(f"Error extracting keywords: {str(e)}")
+                raw_text = summarizer.extract_text_from_pdf(file_path)
+                clean_text = clean_pdf_text(raw_text)
+
+                keywords = summarizer.extract_keywords(clean_text)
+                references = summarizer.extract_references(clean_text)
+
+                # Optional: Debug print
+                print(f"[DEBUG] Extracted {len(references)} references")
         
-        # Get references
-        references = summarizer.extracted_references if hasattr(summarizer, 'extracted_references') else []
+        except Exception as e:
+            print(f"[!] Error extracting keywords/references: {str(e)}")
         
         # Clean up uploaded file
         if os.path.exists(file_path):
@@ -100,10 +124,61 @@ async def summarize_pdf_endpoint(
             "hasCitations": include_citations,
             "keywords": keywords
         })
-    
+
     except Exception as e:
+        print(f"[!] Error in /summarize: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+    
+@app.post("/generate-visuals-video")
+async def generate_visuals_video_endpoint(file: UploadFile = File(...)):
+    try:
+        # Save uploaded PDF
+        pdf_id = str(uuid.uuid4())
+        pdf_filename = f"{pdf_id}.pdf"
+        pdf_path = UPLOAD_FOLDER / pdf_filename
+
+        with open(pdf_path, "wb") as f:
+            f.write(await file.read())
+
+        print(f"[✓] Saved PDF: {pdf_path}")
+
+        # Extract visuals
+        visuals_folder = VIDEO_FOLDER / f"{pdf_id}_visuals"
+        visuals_folder.mkdir(exist_ok=True)
+
+        extract_visual_elements(str(pdf_path), str(visuals_folder))
+
+        # Generate video
+        video_filename = f"{pdf_id}_walkthrough.mp4"
+        video_path = VIDEO_FOLDER / video_filename
+
+        generate_visuals_video(str(visuals_folder), str(video_path))
+
+        print(f"[✓] Video generated: {video_path}")
+
+        return {
+            "video_url": f"/video/{video_filename}",
+            "video_name": video_filename
+        }
+
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+@app.get("/video/{filename}")
+async def get_video(filename: str):
+    video_path = VIDEO_FOLDER / filename
+    if video_path.exists():
+        return FileResponse(str(video_path), media_type="video/mp4")
+    else:
+        return JSONResponse(content={"error": "Video not found"}, status_code=404)
+
+
+
+class AudioRequest(BaseModel):
+    summary: str | None = None
+    text_name: str | None = None
+    stem: str | None = None
 
 @app.post("/generate-audio")
 async def generate_audio(req: AudioRequest):
@@ -119,13 +194,32 @@ async def generate_audio(req: AudioRequest):
         stem = pathlib.Path(text_name).stem
         audio_name = f"{stem}.mp3"
     elif summary:
-        audio_name = f"{uuid.uuid4()}.mp3"
+        stem = str(uuid.uuid4())
+        text_name = f"{stem}.txt"
+        txt_path = UPLOAD_FOLDER / text_name
+        txt_path.write_text(summary, encoding="utf-8")
+        audio_name = f"{stem}.mp3"
     else:
         raise HTTPException(400, "Need either summary string or text_name.")
 
     audio_path = os.path.join(AUDIO_FOLDER, audio_name)
     gTTS(text=summary).save(audio_path)
-    return {"audio_url": f"/audio/{audio_name}", "audio_name": audio_name}
+
+    # Run alignment using imported function
+    try:
+        json_path = align(audio_path, txt_path, lang="eng")
+        align_filename = json_path.name
+        print(f"[✓] Alignment saved: {align_filename}")
+    except Exception as e:
+        print(f"[!] Alignment generation failed: {e}")
+        align_filename = None
+
+    return {
+        "audio_url": f"/audio/{audio_name}",
+        "audio_name": audio_name,
+        "text_name": text_name,
+        "align_file": align_filename
+    }
 
 
 @app.get("/audio/{filename}")

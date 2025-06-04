@@ -88,7 +88,6 @@ def create_video_from_images(image_paths, output_video_path, fps=1, image_durati
     final_clip.write_videofile(output_video_path, fps=fps, codec="libx264", audio_codec="aac")
     print(f"Video saved to {output_video_path}")
 
-
 def main():
     parser = argparse.ArgumentParser(description="Extract images from a PDF and optionally create a video with transitions and audio.")
     parser.add_argument("pdf_path", help="Path to the PDF to extract images from.")
@@ -117,7 +116,6 @@ def main():
             transition_duration=args.transition,
             audio_path=args.audio
         )
-
 
 if __name__ == "__main__":
     main()

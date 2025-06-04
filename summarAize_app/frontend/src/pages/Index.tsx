@@ -9,7 +9,10 @@ import References from '@/components/References';
 import RelatedPapers from '@/components/RelatedPapers';
 import Keywords from '@/components/Keywords';
 import FloatingChatbot from '@/components/FloatingChatbot';
+import VideoPlayer from '@/components/VideoPlayer';
 import { toast } from '@/components/ui/sonner';
+
+const API = import.meta.env.VITE_API_URL || "";
 
 interface RelatedPaper {
   title: string;
@@ -69,17 +72,16 @@ const Index = () => {
     toast("Uploading and analyzing paper...");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/summarize", {
+      const response = await fetch(`${API}/summarize`, {
         method: "POST",
         body: formData,
       });
-
+    
       const data = await response.json();
+    
       if (response.ok) {
         toast.success("Analysis complete!");
-        console.log(`Received ${data.references?.length || 0} references and ${data.keywords?.length || 0} keywords`);
-        
-        // Make sure all required properties are present
+    
         const summaryData: SummaryData = {
           summary: data.summary || "",
           images: data.images || [],
@@ -89,8 +91,30 @@ const Index = () => {
           hasCitations: data.hasCitations || includeCitations,
           keywords: data.keywords || []
         };
-        
+    
         setSummaryData(summaryData);
+    
+        // Now generate video!
+        if (selectedFile) {
+          toast("Generating visuals video...");
+          const videoFormData = new FormData();
+          videoFormData.append("file", selectedFile);
+    
+          const videoResponse = await fetch(`${API}/generate-visuals-video`, {
+            method: "POST",
+            body: videoFormData,
+          });
+    
+          const videoData = await videoResponse.json();
+    
+          if (videoResponse.ok && videoData.video_url) {
+            setVideoUrl(`${API}${videoData.video_url}`);
+            toast.success("Video Ready!");
+          } else {
+            toast.error(`Video generation failed: ${videoData.error}`);
+          }
+        }
+    
       } else {
         toast.error(`Error: ${data.error}`);
       }
@@ -98,7 +122,7 @@ const Index = () => {
       toast.error("Failed to connect to backend.");
     } finally {
       setIsProcessing(false);
-    }
+    }    
   };
 
   return (
@@ -145,21 +169,22 @@ const Index = () => {
                   }}
                 />
               </article>
-              
+
               {summaryData.keywords && summaryData.keywords.length > 0 && (
                 <Keywords keywords={summaryData.keywords} />
               )}
-              
+
               {summaryData.references && summaryData.references.length > 0 && (
                 <References references={summaryData.references} />
               )}
-              
+
               {summaryData.relatedPapers && summaryData.relatedPapers.length > 0 && (
                 <RelatedPapers papers={summaryData.relatedPapers} />
               )}
-              
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-center">
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center space-y-6">
                 <TTSPlayer summary={summaryData.summary} />
+                {videoUrl && <VideoPlayer videoUrl={videoUrl} />}
               </div>
             </section>
           )}
