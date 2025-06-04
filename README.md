@@ -1,4 +1,6 @@
 # SummarAIzer-Project
+Project Title: SummarAIze
+Team Members: Ashton Liu, Koena Gupta, Amisha Kandi, Nathan Yu, Poojitha Panda
 
 ## Final Submission Documents
 1. [Release Summary](release_summary.pdf)
