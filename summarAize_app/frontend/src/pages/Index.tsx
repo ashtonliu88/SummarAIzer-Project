@@ -32,6 +32,7 @@ interface Keyword {
 
 interface SummaryData {
   summary: string;
+  images: string[]; 
   references: string[];
   referenceCount?: number;
   relatedPapers: RelatedPaper[];
@@ -39,15 +40,16 @@ interface SummaryData {
   keywords?: Keyword[];
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
 const Index = () => {
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [includeCitations, setIncludeCitations] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('beginner');
-  const [relatedPapers, setRelatedPapers] = useState<RelatedPaper[]>([]);
-  const [videoUrl, setVideoUrl] = useState<string>("");
-
+  const [summary, setSummary] = useState<string>('');
+  const [images, setImages]   = useState<string[]>([]);
 
   const handleProcess = async () => {
     if (!selectedFile) {
@@ -82,6 +84,7 @@ const Index = () => {
     
         const summaryData: SummaryData = {
           summary: data.summary || "",
+          images: data.images || [],
           references: data.references || [],
           referenceCount: data.referenceCount || data.references?.length || 0,
           relatedPapers: data.relatedPapers || [],

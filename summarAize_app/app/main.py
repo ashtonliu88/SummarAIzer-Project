@@ -32,14 +32,16 @@ app.add_middleware(
 summarizer = PdfSummarizer()
 chatbot = SummaryRefiner()
 
-BASE = pathlib.Path(__file__).parent
-UPLOAD_FOLDER = BASE / "uploads"
-AUDIO_FOLDER = BASE / "generated_audios"
-VIDEO_FOLDER = BASE / "generated_videos"
-UPLOAD_FOLDER.mkdir(exist_ok=True)
-AUDIO_FOLDER.mkdir(exist_ok=True)
-VIDEO_FOLDER.mkdir(exist_ok=True)
+AUDIO_FOLDER = "generated_audios"
+os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
+UPLOAD_FOLDER = Path("uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+IMAGE_FOLDER  = Path("images")
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
+
+app.mount("/images", StaticFiles(directory=IMAGE_FOLDER),name="images")
 class AudioRequest(BaseModel):
     summary: Optional[str] = None
     text_name: Optional[str] = None
@@ -86,6 +88,10 @@ async def summarize_pdf_endpoint(
             detailed=is_detailed,
             include_citations=include_citations
         )
+
+        #extracting images
+        image_files = extract_images(str(pdf_path), str(IMAGE_FOLDER))
+        image_urls = [f"/images/{name}" for name in image_files]
         
         # Extract keywords & references from cleaned text
         keywords = []
@@ -109,6 +115,8 @@ async def summarize_pdf_endpoint(
         if os.path.exists(file_path):
             os.remove(file_path)
 
+        
+        
         return JSONResponse(content={
             "summary": summary, 
             "references": references,
