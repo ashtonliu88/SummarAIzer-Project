@@ -30,9 +30,13 @@ chatbot = SummaryRefiner()
 AUDIO_FOLDER = "generated_audios"
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = Path("uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+IMAGE_FOLDER  = Path("images")
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
+
+app.mount("/images", StaticFiles(directory=IMAGE_FOLDER),name="images")
 class AudioRequest(BaseModel):
     summary: Optional[str] = None
     text_name: Optional[str] = None
@@ -65,6 +69,10 @@ async def summarize_pdf_endpoint(
             detailed=is_detailed,
             include_citations=include_citations
         )
+
+        #extracting images
+        image_files = extract_images(str(pdf_path), str(IMAGE_FOLDER))
+        image_urls = [f"/images/{name}" for name in image_files]
         
         # Extract keywords if available
         keywords = []
@@ -83,6 +91,8 @@ async def summarize_pdf_endpoint(
         if os.path.exists(file_path):
             os.remove(file_path)
 
+        
+        
         return JSONResponse(content={
             "summary": summary, 
             "references": references,
