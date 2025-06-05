@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from typing import List, Dict, Optional
 from pydantic import BaseModel
 from pathlib import Path
-import os, uuid, pathlib
+import os, uuid, pathlib, time
 from gtts import gTTS
 from textSummarize import PdfSummarizer
 from extractVisuals import extract_visual_elements, generate_visuals_video
@@ -15,6 +15,7 @@ from imageExtract import extract_images
 from chatbot import SummaryRefiner
 import requests
 from auth import get_current_user, UserInfo
+from storage_service import storage_service
 
 from services.aligner import align
 # from services.related import get_related_papers
@@ -385,3 +386,186 @@ async def save_to_library(
         "summary_id": summary.id,
         "message": "Summary saved to library"
     }
+
+@app.post("/generate-visuals-video-auth")
+async def generate_visuals_video_authenticated(
+    file: UploadFile = File(...),
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Generate video from PDF visuals and save to user's Firebase storage
+    """
+    start_time = time.time()
+    
+    try:
+        # Save uploaded PDF
+        pdf_id = str(uuid.uuid4())
+        pdf_filename = f"{pdf_id}.pdf"
+        pdf_path = UPLOAD_FOLDER / pdf_filename
+
+        with open(pdf_path, "wb") as f:
+            f.write(await file.read())
+
+        print(f"[✓] Saved PDF: {pdf_path}")
+
+        # Extract visuals
+        visuals_folder = VIDEO_FOLDER / f"{pdf_id}_visuals"
+        visuals_folder.mkdir(exist_ok=True)
+
+        extract_time = time.time()
+        try:
+            extract_visual_elements(str(pdf_path), str(visuals_folder))
+        except Exception as extract_error:
+            print(f"[!] Error extracting visuals: {extract_error}")
+            return JSONResponse(content={"error": f"Failed to extract visuals: {str(extract_error)}"}, status_code=500)
+
+        extract_time = time.time() - extract_time
+        print(f"[✓] Visual extraction completed in {extract_time:.2f}s")
+
+        # Generate video
+        video_filename = f"{current_user.uid}_{pdf_id}_walkthrough.mp4"
+        video_path = VIDEO_FOLDER / video_filename
+
+        video_time = time.time()
+        try:
+            generate_visuals_video(str(visuals_folder), str(video_path))
+        except Exception as video_error:
+            print(f"[!] Error generating video: {video_error}")
+            return JSONResponse(content={"error": f"Failed to generate video: {str(video_error)}"}, status_code=500)
+
+        video_time = time.time() - video_time
+        print(f"[✓] Video generation completed in {video_time:.2f}s")
+
+        # Upload to Firebase Storage
+        firebase_url = None
+        try:
+            upload_result = storage_service.upload_video(
+                user_id=current_user.uid,
+                video_file_path=str(video_path),
+                video_name=video_filename
+            )
+            firebase_url = upload_result["download_url"]
+            print(f"[✓] Video uploaded to Firebase: {firebase_url}")
+        except Exception as upload_error:
+            print(f"[!] Error uploading to Firebase: {upload_error}")
+            # Still return local video URL if Firebase fails
+            firebase_url = None
+
+        # Clean up temporary files
+        try:
+            os.remove(pdf_path)
+            # Clean up visuals folder
+            import shutil
+            shutil.rmtree(visuals_folder, ignore_errors=True)
+            # Keep local video for backup but could be cleaned up later
+        except:
+            pass
+
+        total_time = time.time() - start_time
+        print(f"[✓] Total video generation process completed in {total_time:.2f}s")
+
+        return {
+            "video_url": f"/video/{video_filename}",
+            "video_name": video_filename,
+            "firebase_url": firebase_url,
+            "user_id": current_user.uid,
+            "extract_time": extract_time,
+            "video_time": video_time,
+            "total_time": total_time
+        }
+
+    except Exception as e:
+        total_time = time.time() - start_time
+        print(f"[!] Error in /generate-visuals-video-auth: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/user-videos")
+async def get_user_videos(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Get list of all videos for the authenticated user
+    """
+    try:
+        videos = storage_service.get_user_videos(current_user.uid)
+        return {
+            "user_id": current_user.uid,
+            "videos": videos,
+            "count": len(videos)
+        }
+    except Exception as e:
+        print(f"[!] Error getting user videos: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.delete("/user-videos/{video_name}")
+async def delete_user_video(
+    video_name: str,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Delete a specific video for the authenticated user
+    """
+    try:
+        success = storage_service.delete_user_video(current_user.uid, video_name)
+        if success:
+            return {
+                "message": f"Video '{video_name}' deleted successfully",
+                "video_name": video_name
+            }
+        else:
+            return JSONResponse(
+                content={"error": f"Video '{video_name}' not found"},
+                status_code=404
+            )
+    except Exception as e:
+        print(f"[!] Error deleting user video: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/user-videos/{video_name}/download")
+async def get_user_video_download_url(
+    video_name: str,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Get download URL for a specific user's video
+    """
+    try:
+        download_url = storage_service.get_video_download_url(current_user.uid, video_name)
+        if download_url:
+            return {
+                "video_name": video_name,
+                "download_url": download_url
+            }
+        else:
+            return JSONResponse(
+                content={"error": f"Video '{video_name}' not found"},
+                status_code=404
+            )
+    except Exception as e:
+        print(f"[!] Error getting video download URL: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.get("/test-storage")
+async def test_storage_endpoint(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Test endpoint to verify Firebase Storage is working.
+    """
+    try:
+        if not storage_service.bucket:
+            return {"status": "error", "message": "Firebase Storage not initialized"}
+        
+        # Try to list user's videos
+        videos = storage_service.get_user_videos(current_user.uid)
+        
+        return {
+            "status": "success",
+            "message": "Firebase Storage is working",
+            "user_id": current_user.uid,
+            "video_count": len(videos)
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": f"Firebase Storage error: {str(e)}"
+        }

@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Firebase Storage security rules for SummarAIze video storage
+// These rules ensure users can only access their own videos
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Users can only access their own video files
+    match /users/{userId}/videos/{allPaths=**} {
+      // Allow read/write/delete only if the user is authenticated 
+      // and the userId matches their authentication ID
+      allow read, write, delete: if request.auth != null 
+                                && request.auth.uid == userId;
+    }
+    
+    // Deny access to all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

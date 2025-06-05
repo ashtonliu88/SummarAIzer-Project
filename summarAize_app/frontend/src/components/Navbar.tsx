@@ -38,6 +38,12 @@ const Navbar = () => {
           >
             My Library
           </Link>
+          <Link 
+            to="/videos" 
+            className="text-white text-sm hover:underline hover:text-gray-200 transition-all"
+          >
+            My Videos
+          </Link>
           
           {currentUser ? (
             <div className="flex items-center space-x-4">
