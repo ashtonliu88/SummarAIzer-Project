@@ -21,5 +21,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 115a_venv
+
+# Firebase credentials
+**/credentials/
+**/firebase-service-account.json
+firebase-service-account.json
+
 # Generated audio directories
 **/generated_audios/

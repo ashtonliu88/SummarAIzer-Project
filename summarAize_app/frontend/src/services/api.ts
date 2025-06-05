@@ -124,3 +124,85 @@ export const libraryApi = {
     });
   },
 };
+
+/**
+ * API service for video operations
+ */
+export const videoApi = {
+  /**
+   * Generate video from PDF with authentication (saves to user's Firebase storage)
+   */
+  generateVideo: async (file: File) => {
+    const token = await getToken();
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_URL}/generate-visuals-video-auth`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(errorData.message || `Video generation failed: ${response.status}`);
+    }
+    
+    return await response.json() as {
+      video_url: string;
+      video_name: string;
+      firebase_url?: string;
+      user_id: string;
+      extract_time: number;
+      video_time: number;
+      total_time: number;
+    };
+  },
+  
+  /**
+   * Get all videos for the authenticated user
+   */
+  getUserVideos: async () => {
+    return fetchWithAuth<{
+      user_id: string;
+      videos: Array<{
+        video_name: string;
+        storage_path: string;
+        download_url: string;
+        size: number;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      count: number;
+    }>('/user-videos', {
+      method: 'GET',
+    });
+  },
+  
+  /**
+   * Delete a specific video for the authenticated user
+   */
+  deleteVideo: async (videoName: string) => {
+    return fetchWithAuth<{
+      message: string;
+      video_name: string;
+    }>(`/user-videos/${videoName}`, {
+      method: 'DELETE',
+    });
+  },
+  
+  /**
+   * Get download URL for a specific user's video
+   */
+  getVideoDownloadUrl: async (videoName: string) => {
+    return fetchWithAuth<{
+      video_name: string;
+      download_url: string;
+    }>(`/user-videos/${videoName}/download`, {
+      method: 'GET',
+    });
+  },
+};

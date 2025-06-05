@@ -10,9 +10,10 @@ import RelatedPapers from '@/components/RelatedPapers';
 import Keywords from '@/components/Keywords';
 import FloatingChatbot from '@/components/FloatingChatbot';
 import VideoPlayer from '@/components/VideoPlayer';
-import UserVideos from '@/components/UserVideos';
 import { toast } from '@/components/ui/sonner';
 import { videoApi } from '@/services/api';
+
+const API = import.meta.env.VITE_API_URL || "";
 
 interface RelatedPaper {
   title: string;
@@ -40,7 +41,7 @@ interface SummaryData {
   keywords?: Keyword[];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 const Index = () => {
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
@@ -48,6 +49,8 @@ const Index = () => {
   const [includeCitations, setIncludeCitations] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('beginner');
+  const [summary, setSummary] = useState<string>('');
+  const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
 
@@ -72,7 +75,7 @@ const Index = () => {
     toast("Uploading and analyzing paper...");
 
     try {
-      const response = await fetch(`${API_BASE}/summarize`, {
+      const response = await fetch(`${API}/summarize`, {
         method: "POST",
         body: formData,
       });
@@ -100,16 +103,26 @@ const Index = () => {
           toast("Generating visuals video...");
           
           try {
-            const videoResult = await videoApi.generateVideo(selectedFile);
-            
-            // Use Firebase URL if available, otherwise fallback to local URL
-            const finalVideoUrl = videoResult.firebase_url || `${API_BASE}${videoResult.video_url}`;
-            setVideoUrl(finalVideoUrl);
-            
-            toast.success(`Video Ready! Generated in ${videoResult.total_time.toFixed(1)}s`);
+            const videoFormData = new FormData();
+            videoFormData.append("file", selectedFile);
+    
+            const videoResponse = await fetch(`${API}/generate-visuals-video`, {
+              method: "POST",
+              body: videoFormData,
+            });
+    
+            const videoData = await videoResponse.json();
+    
+            if (videoResponse.ok && videoData.video_url) {
+              setVideoUrl(`${API}${videoData.video_url}`);
+              toast.success("Video Ready!");
+            } else {
+              console.error("Video generation error:", videoData.error);
+              toast.error(`Video generation failed: ${videoData.error || 'Unknown error'}`);
+            }
           } catch (videoError) {
-            console.error("Video generation error:", videoError);
-            toast.error(`Video generation failed: ${videoError instanceof Error ? videoError.message : 'Unknown error'}`);
+            console.error("Video generation network error:", videoError);
+            toast.error("Failed to generate video - network error");
           } finally {
             setIsGeneratingVideo(false);
           }
@@ -145,6 +158,11 @@ const Index = () => {
               setSelectedFile={setSelectedFile}
               includeCitations={includeCitations}
               setIncludeCitations={setIncludeCitations}
+              onSummaryReady={(summary, images) => {
+                // This is a fallback, but we primarily use DifficultySelector's onProcess
+                setSummary(summary);
+                setImages(images);
+              }}
             />
             
             <DifficultySelector 
@@ -186,9 +204,6 @@ const Index = () => {
                 <TTSPlayer summary={summaryData.summary} />
                 {videoUrl && <VideoPlayer videoUrl={videoUrl} />}
               </div>
-
-              {/* User Video Library */}
-              <UserVideos />
             </section>
           )}
         </main>

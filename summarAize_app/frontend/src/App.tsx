@@ -8,6 +8,7 @@ import { ReactNode } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Library from "./pages/Library";
+import VideoLibrary from "./pages/VideoLibrary";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import LandingPage from "./pages/LandingPage";
@@ -67,6 +68,11 @@ const AppRoutes = () => {
       <Route path="/library" element={
         <ProtectedRoute>
           <Library />
+        </ProtectedRoute>
+      } />
+      <Route path="/videos" element={
+        <ProtectedRoute>
+          <VideoLibrary />
         </ProtectedRoute>
       } />
       <Route path="/login" element={
