@@ -10,7 +10,6 @@ import RelatedPapers from '@/components/RelatedPapers';
 import Keywords from '@/components/Keywords';
 import FloatingChatbot from '@/components/FloatingChatbot';
 import VideoPlayer from '@/components/VideoPlayer';
-import UserVideos from '@/components/UserVideos';
 import { toast } from '@/components/ui/sonner';
 import { videoApi } from '@/services/api';
 
@@ -186,9 +185,6 @@ const Index = () => {
                 <TTSPlayer summary={summaryData.summary} />
                 {videoUrl && <VideoPlayer videoUrl={videoUrl} />}
               </div>
-
-              {/* User Video Library */}
-              <UserVideos />
             </section>
           )}
         </main>
