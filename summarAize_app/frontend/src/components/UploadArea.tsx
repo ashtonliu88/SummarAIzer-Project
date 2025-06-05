@@ -7,15 +7,13 @@ interface UploadAreaProps {
   setSelectedFile: (file: File | null) => void;
   includeCitations: boolean;
   setIncludeCitations: (include: boolean) => void;
-  onSummaryReady: (summary: string, images: string[]) => void;
 }
 
 const UploadArea: React.FC<UploadAreaProps> = ({ 
   selectedFile, 
   setSelectedFile, 
   includeCitations, 
-  setIncludeCitations, 
-  onSummaryReady
+  setIncludeCitations
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,35 +30,6 @@ const UploadArea: React.FC<UploadAreaProps> = ({
     if (!file) return;
     setSelectedFile(file);
     toast.success(`Selected: ${file.name}`);
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedFile) {
-      toast.error('Please select a PDF first.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('detailed', includeCitations ? 'true' : 'false');
-
-    toast('Uploading and summarizing...');
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/summarize', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      if (response.ok) {
-        toast.success('Summary Ready!');
-        onSummaryReady(data.summary, data.images || []);
-      } else {
-        toast.error(`Error: ${data.error}`);
-      }
-    } catch (err) {
-      toast.error('Failed to connect to backend.');
-    }
   };
 
   return (
@@ -110,13 +79,6 @@ const UploadArea: React.FC<UploadAreaProps> = ({
           </span>
         </label>
       </div>
-
-      <button
-        onClick={handleSubmit}
-        className="mt-4 w-full bg-[#2261CF] text-white py-2 rounded-lg hover:bg-[#1a4ca8] transition-colors"
-      >
-        Summarize Now
-      </button>
     </div>
   );
 };

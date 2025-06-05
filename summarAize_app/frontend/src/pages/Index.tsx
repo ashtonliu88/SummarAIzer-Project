@@ -48,8 +48,6 @@ const Index = () => {
   const [includeCitations, setIncludeCitations] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('beginner');
-  const [summary, setSummary] = useState<string>('');
-  const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
 
@@ -147,11 +145,6 @@ const Index = () => {
               setSelectedFile={setSelectedFile}
               includeCitations={includeCitations}
               setIncludeCitations={setIncludeCitations}
-              onSummaryReady={(summary, images) => {
-                // This is a fallback, but we primarily use DifficultySelector's onProcess
-                setSummary(summary);
-                setImages(images);
-              }}
             />
             
             <DifficultySelector 

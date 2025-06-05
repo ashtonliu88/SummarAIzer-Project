@@ -198,44 +198,125 @@ class AudioRequest(BaseModel):
 
 @app.post("/generate-audio")
 async def generate_audio(req: AudioRequest):
-    summary   = req.summary
-    text_name = req.text_name
-
-    if text_name:
-        txt_path = os.path.join(UPLOAD_FOLDER, text_name)
-        if not os.path.exists(txt_path):
-            raise HTTPException(404, "summary file not found on server")
-        with open(txt_path, 'r', encoding='utf-8') as f:
-            summary = f.read()
-        stem = pathlib.Path(text_name).stem
-        audio_name = f"{stem}.mp3"
-    elif summary:
-        stem = str(uuid.uuid4())
-        text_name = f"{stem}.txt"
-        txt_path = UPLOAD_FOLDER / text_name
-        txt_path.write_text(summary, encoding="utf-8")
-        audio_name = f"{stem}.mp3"
-    else:
-        raise HTTPException(400, "Need either summary string or text_name.")
-
-    audio_path = os.path.join(AUDIO_FOLDER, audio_name)
-    gTTS(text=summary).save(audio_path)
-
-    # Run alignment using imported function
     try:
-        json_path = align(audio_path, txt_path, lang="eng")
-        align_filename = json_path.name
-        print(f"[✓] Alignment saved: {align_filename}")
-    except Exception as e:
-        print(f"[!] Alignment generation failed: {e}")
-        align_filename = None
+        summary = req.summary
+        text_name = req.text_name
 
-    return {
-        "audio_url": f"/audio/{audio_name}",
-        "audio_name": audio_name,
-        "text_name": text_name,
-        "align_file": align_filename
-    }
+        # Validate input
+        if not summary and not text_name:
+            raise HTTPException(400, "Need either summary string or text_name.")
+        
+        if not summary:  # If no summary provided, read from text file
+            if text_name:
+                txt_path = os.path.join(UPLOAD_FOLDER, text_name)
+                if not os.path.exists(txt_path):
+                    raise HTTPException(404, "summary file not found on server")
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    summary = f.read()
+                stem = pathlib.Path(text_name).stem
+                audio_name = f"{stem}.mp3"
+        else:  # Create text file from summary
+            stem = str(uuid.uuid4())
+            text_name = f"{stem}.txt"
+            txt_path = UPLOAD_FOLDER / text_name
+            txt_path.write_text(summary, encoding="utf-8")
+            audio_name = f"{stem}.mp3"
+
+        # Validate summary content
+        if not summary or len(summary.strip()) == 0:
+            raise HTTPException(400, "Summary content is empty")
+        
+        # Limit summary length to prevent very long TTS requests
+        if len(summary) > 5000:  # Limit to ~5000 characters
+            print(f"[WARNING] Summary too long ({len(summary)} chars), truncating to 5000 chars")
+            summary = summary[:5000] + "..."
+
+        audio_path = os.path.join(AUDIO_FOLDER, audio_name)
+        
+        # Try to generate TTS with error handling and retries
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"[DEBUG] Attempting TTS generation (attempt {attempt + 1}/{max_retries})")
+                
+                # Create gTTS object with explicit language and slow=False for better reliability
+                tts = gTTS(text=summary, lang='en', slow=False)
+                tts.save(audio_path)
+                
+                # Verify the file was created and has content
+                if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+                    print(f"[✓] TTS generation successful on attempt {attempt + 1}")
+                    break
+                else:
+                    raise Exception("Generated audio file is empty or corrupted")
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[!] TTS generation failed on attempt {attempt + 1}: {error_msg}")
+                
+                # Provide more specific error messages
+                if "Failed to connect" in error_msg:
+                    specific_error = "Cannot connect to Google TTS service. Please check your internet connection."
+                elif "403" in error_msg or "Forbidden" in error_msg:
+                    specific_error = "Google TTS service access denied. The service may be rate-limited."
+                elif "502" in error_msg or "503" in error_msg:
+                    specific_error = "Google TTS service is temporarily down."
+                elif "timeout" in error_msg.lower():
+                    specific_error = "Request to Google TTS service timed out."
+                else:
+                    specific_error = f"TTS generation error: {error_msg}"
+                
+                if attempt < max_retries - 1:
+                    print(f"[DEBUG] Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"[!] TTS generation failed after {max_retries} attempts")
+                    # Create a fallback response without audio
+                    return JSONResponse(
+                        content={
+                            "error": "TTS service temporarily unavailable",
+                            "audio_url": None,
+                            "audio_name": None,
+                            "text_name": text_name,
+                            "align_file": None,
+                            "message": specific_error,
+                            "fallback": True,
+                            "retry_after": 300  # Suggest retrying after 5 minutes
+                        },
+                        status_code=503  # Service Unavailable
+                    )
+
+        # Run alignment using imported function
+        try:
+            json_path = align(audio_path, txt_path, lang="eng")
+            align_filename = json_path.name
+            print(f"[✓] Alignment saved: {align_filename}")
+        except Exception as e:
+            print(f"[!] Alignment generation failed: {e}")
+            align_filename = None
+
+        return {
+            "audio_url": f"/audio/{audio_name}",
+            "audio_name": audio_name,
+            "text_name": text_name,
+            "align_file": align_filename
+        }
+    
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        print(f"[!] Unexpected error in generate_audio: {str(e)}")
+        return JSONResponse(
+            content={
+                "error": "Internal server error",
+                "message": "An unexpected error occurred while generating audio",
+                "details": str(e)
+            },
+            status_code=500
+        )
 
 
 @app.get("/audio/{filename}")
