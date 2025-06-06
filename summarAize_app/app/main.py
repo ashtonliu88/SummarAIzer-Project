@@ -16,6 +16,7 @@ from chatbot import SummaryRefiner
 import requests
 from auth import get_current_user, UserInfo
 from storage_service import storage_service
+from firestore_service import firestore_service
 
 from services.aligner import align
 # from services.related import get_related_papers
@@ -474,7 +475,7 @@ async def generate_visuals_video_authenticated(
     current_user: UserInfo = Depends(get_current_user)
 ):
     """
-    Generate video from PDF visuals and save to user's Firebase storage
+    Generate video from PDF visuals and save to user's Firebase storage with metadata
     """
     start_time = time.time()
     
@@ -488,6 +489,37 @@ async def generate_visuals_video_authenticated(
             f.write(await file.read())
 
         print(f"[✓] Saved PDF: {pdf_path}")
+
+        # Extract text for metadata
+        print(f"[DEBUG] Extracting text from PDF for metadata...")
+        try:
+            from textSummarize import extract_text_from_pdf, extract_keywords, extract_references
+            pdf_text = extract_text_from_pdf(str(pdf_path))
+            
+            # Extract key concepts
+            key_concepts = []
+            if pdf_text:
+                try:
+                    keywords_result = extract_keywords(pdf_text)
+                    if keywords_result and 'keywords' in keywords_result:
+                        key_concepts = keywords_result['keywords']
+                        print(f"[✓] Extracted {len(key_concepts)} key concepts")
+                except Exception as e:
+                    print(f"[!] Error extracting keywords: {e}")
+            
+            # Extract references
+            references = []
+            if pdf_text:
+                try:
+                    references = extract_references(pdf_text)
+                    print(f"[✓] Extracted {len(references)} references")
+                except Exception as e:
+                    print(f"[!] Error extracting references: {e}")
+                    
+        except Exception as e:
+            print(f"[!] Error extracting PDF metadata: {e}")
+            key_concepts = []
+            references = []
 
         # Extract visuals
         visuals_folder = VIDEO_FOLDER / f"{pdf_id}_visuals"
@@ -517,8 +549,12 @@ async def generate_visuals_video_authenticated(
         video_time = time.time() - video_time
         print(f"[✓] Video generation completed in {video_time:.2f}s")
 
+        # Get video file size
+        video_size = os.path.getsize(video_path) if os.path.exists(video_path) else 0
+
         # Upload to Firebase Storage
         firebase_url = None
+        storage_path = None
         try:
             upload_result = storage_service.upload_video(
                 user_id=current_user.uid,
@@ -526,11 +562,38 @@ async def generate_visuals_video_authenticated(
                 video_name=video_filename
             )
             firebase_url = upload_result["download_url"]
+            storage_path = upload_result.get("storage_path", f"users/{current_user.uid}/videos/{video_filename}")
             print(f"[✓] Video uploaded to Firebase: {firebase_url}")
         except Exception as upload_error:
             print(f"[!] Error uploading to Firebase: {upload_error}")
-            # Still return local video URL if Firebase fails
+            # Still proceed with Firestore metadata even if Firebase upload fails
             firebase_url = None
+
+        # Save metadata to Firestore
+        try:
+            # Create display name from original filename (remove UUID prefix)
+            original_filename = file.filename or f"uploaded_pdf_{pdf_id}.pdf"
+            display_name = original_filename.rsplit('.', 1)[0]  # Remove extension
+            
+            video_metadata = {
+                'display_name': display_name,
+                'original_filename': original_filename,
+                'storage_path': storage_path,
+                'firebase_url': firebase_url,
+                'local_video_url': f"/video/{video_filename}",
+                'size': video_size,
+                'key_concepts': key_concepts,
+                'references': references,
+                'extract_time': extract_time,
+                'video_time': video_time,
+                'total_time': time.time() - start_time
+            }
+            
+            doc_id = firestore_service.save_video_metadata(current_user.uid, video_metadata)
+            print(f"[✓] Video metadata saved to Firestore with ID: {doc_id}")
+            
+        except Exception as firestore_error:
+            print(f"[!] Error saving to Firestore: {firestore_error}")
 
         # Clean up temporary files
         try:
@@ -552,7 +615,10 @@ async def generate_visuals_video_authenticated(
             "user_id": current_user.uid,
             "extract_time": extract_time,
             "video_time": video_time,
-            "total_time": total_time
+            "total_time": total_time,
+            "key_concepts": key_concepts,
+            "references": references,
+            "display_name": display_name
         }
 
     except Exception as e:
@@ -650,3 +716,114 @@ async def test_storage_endpoint(current_user: UserInfo = Depends(get_current_use
             "status": "error", 
             "message": f"Firebase Storage error: {str(e)}"
         }
+
+@app.get("/firestore-videos")
+async def get_firestore_user_videos(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Get list of all videos for the authenticated user from Firestore
+    """
+    try:
+        videos = firestore_service.get_user_videos(current_user.uid)
+        return {
+            "user_id": current_user.uid,
+            "videos": videos,
+            "count": len(videos)
+        }
+    except Exception as e:
+        print(f"[!] Error getting Firestore user videos: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.delete("/firestore-videos/{video_id}")
+async def delete_firestore_user_video(
+    video_id: str,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Delete a specific video by Firestore document ID
+    """
+    try:
+        success = firestore_service.delete_video(current_user.uid, video_id)
+        if success:
+            return {
+                "message": f"Video with ID {video_id} deleted successfully",
+                "video_id": video_id
+            }
+        else:
+            return JSONResponse(
+                content={"error": f"Video with ID '{video_id}' not found"},
+                status_code=404
+            )
+    except Exception as e:
+        print(f"[!] Error deleting Firestore video: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.put("/firestore-videos/{video_id}/rename")
+async def rename_firestore_video(
+    video_id: str,
+    request: dict = Body(...),
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Rename a video by updating its display_name
+    """
+    try:
+        new_name = request.get('new_name')
+        
+        if not new_name:
+            return JSONResponse(
+                content={"error": "new_name is required in request body"},
+                status_code=400
+            )
+        
+        success = firestore_service.update_video_display_name(current_user.uid, video_id, new_name)
+        if success:
+            return {
+                "message": f"Video renamed successfully",
+                "video_id": video_id,
+                "new_name": new_name
+            }
+        else:
+            return JSONResponse(
+                content={"error": f"Video with ID '{video_id}' not found"},
+                status_code=404
+            )
+    except Exception as e:
+        print(f"[!] Error renaming Firestore video: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.get("/firestore-videos/search")
+async def search_firestore_videos_by_concepts(
+    concepts: str,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Search videos by key concepts
+    """
+    try:
+        concept_list = [c.strip() for c in concepts.split(',') if c.strip()]
+        videos = firestore_service.search_videos_by_concepts(current_user.uid, concept_list)
+        return {
+            "user_id": current_user.uid,
+            "videos": videos,
+            "count": len(videos),
+            "search_concepts": concept_list
+        }
+    except Exception as e:
+        print(f"[!] Error searching Firestore videos by concepts: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.get("/firestore-videos/concepts")
+async def get_user_concepts(current_user: UserInfo = Depends(get_current_user)):
+    """
+    Get all unique concepts from user's videos
+    """
+    try:
+        concepts = firestore_service.get_all_user_concepts(current_user.uid)
+        return {
+            "user_id": current_user.uid,
+            "concepts": concepts,
+            "count": len(concepts)
+        }
+    except Exception as e:
+        print(f"[!] Error getting user concepts: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)

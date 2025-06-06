@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ReactNode } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Index from "./pages/Index";
-import Library from "./pages/Library";
 import VideoLibrary from "./pages/VideoLibrary";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
@@ -65,11 +64,6 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={currentUser ? <Index /> : <LandingPage />} />
-      <Route path="/library" element={
-        <ProtectedRoute>
-          <Library />
-        </ProtectedRoute>
-      } />
       <Route path="/videos" element={
         <ProtectedRoute>
           <VideoLibrary />
