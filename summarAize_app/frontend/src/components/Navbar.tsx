@@ -47,7 +47,7 @@ const Navbar = () => {
               <Button 
                 onClick={handleLogout}
                 variant="outline" 
-                className="text-white text-sm border-white hover:bg-white hover:text-[#2261CF]"
+                className="!bg-white !border-white text-[#2261CF] hover:!bg-gray-100"
                 size="sm"
               >
                 Logout
