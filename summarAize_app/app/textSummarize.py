@@ -291,7 +291,11 @@ class PdfSummarizer:
                 f.write(final_summary)
             print(f"Summary saved to {output_path}")
         
-        return final_summary
+        return {
+            'summary': final_summary,
+            'references': self.extracted_references,
+            'reference_count': len(self.extracted_references)
+        }
 
     def extract_references(self, text):
         """
