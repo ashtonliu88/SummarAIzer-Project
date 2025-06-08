@@ -89,7 +89,7 @@ async def summarize_pdf_endpoint(
             f.write(await file.read())
         
         # Process the PDF to generate summary
-        summary = summarizer.summarize_pdf(
+        result = summarizer.summarize_pdf(
             file_path, 
             chunk_method="sentence",
             parallel=True,
@@ -126,9 +126,9 @@ async def summarize_pdf_endpoint(
         
         
         return JSONResponse(content={
-            "summary": summary, 
-            "references": references,
-            "referenceCount": len(references),
+            "summary": result['summary'], 
+            "references": result['references'], 
+            "referenceCount": result['reference_count'],
             "hasCitations": include_citations,
             "keywords": keywords
         })
