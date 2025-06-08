@@ -1,4 +1,3 @@
-// src/pages/Index.tsx
 import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import UploadArea from '@/components/UploadArea';
@@ -12,6 +11,7 @@ import FloatingChatbot from '@/components/FloatingChatbot';
 import VideoPlayer from '@/components/VideoPlayer';
 import { toast } from '@/components/ui/sonner';
 import { videoApi } from '@/services/api';
+import { Volume2, Video } from 'lucide-react';
 
 interface RelatedPaper {
   title: string;
@@ -181,10 +181,39 @@ const Index = () => {
                 <RelatedPapers papers={summaryData.relatedPapers} />
               )}
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center space-y-6">
-                <TTSPlayer summary={summaryData.summary} />
-                {videoUrl && <VideoPlayer videoUrl={videoUrl} />}
-              </div>
+              {/* Media Section with Header */}
+              <section className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="flex items-center space-x-2">
+                    <Volume2 className="w-6 h-6 text-purple-600" />
+                    <Video className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900">Audio & Video</h2>
+                  <span className="text-gray-500 text-lg">(2)</span>
+                </div>
+                
+                <div className="space-y-8">
+                  {/* Audio Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Volume2 className="w-5 h-5 text-purple-600" />
+                      <h3 className="text-lg font-semibold text-gray-800">Audio Summary</h3>
+                    </div>
+                    <TTSPlayer summary={summaryData.summary} />
+                  </div>
+
+                  {/* Video Section */}
+                  {videoUrl && (
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Video className="w-5 h-5 text-purple-600" />
+                        <h3 className="text-lg font-semibold text-gray-800">Visual Summary</h3>
+                      </div>
+                      <VideoPlayer videoUrl={videoUrl} />
+                    </div>
+                  )}
+                </div>
+              </section>
             </section>
           )}
         </main>

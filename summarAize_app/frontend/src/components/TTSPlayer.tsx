@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from '@/components/ui/sonner';
+import { Download } from 'lucide-react';
 
 interface TTSPlayerProps {
   summary: string;
@@ -62,10 +63,20 @@ const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary }) => {
     generateAudio();
   }, [summary]);
 
+  const handleDownload = () => {
+    if (!audioUrl) return;
+    const link = document.createElement('a');
+    link.href = audioUrl;
+    link.download = `summary-audio-${Date.now()}.mp3`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (!summary) return null;
 
   return (
-    <div className="mt-6 flex flex-col items-center">
+    <div className="space-y-4">
       {hasError ? (
         <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-yellow-800 font-medium mb-2">Audio Generation Unavailable</p>
@@ -79,25 +90,30 @@ const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary }) => {
         </div>
       ) : audioUrl ? (
         <>
-          <audio controls className="mb-2">
-            <source src={audioUrl} type="audio/mpeg" />
-            Your browser does not support the audio element.
-          </audio>
-          <a 
-            href={audioUrl} 
-            download 
-            className="text-blue-500 hover:text-blue-600 underline text-sm transition-colors"
-          >
-            Download Audio
-          </a>
+          <div className="flex justify-center">
+            <audio controls className="w-full max-w-2xl">
+              <source src={audioUrl} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+          
+          <div className="flex justify-center">
+            <button
+              onClick={handleDownload}
+              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Audio</span>
+            </button>
+          </div>
         </>
       ) : isGenerating ? (
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
           <p className="text-gray-500">Generating audio...</p>
         </div>
       ) : (
-        <p className="text-gray-500">Preparing audio generation...</p>
+        <p className="text-gray-500 text-center">Preparing audio generation...</p>
       )}
     </div>
   );
