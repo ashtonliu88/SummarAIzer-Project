@@ -1,4 +1,6 @@
-/backend/app/.env
+/summarAize_app/app/.env
+/summarAize_app/app/generated_audios
+/summarAize_app/app/generated_audios/alignments
 /summarAize_app/frontend/.env
 .env
 .env.local
