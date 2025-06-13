@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, auth
 from typing import Dict, Optional
+from firebase_admin import auth as firebase_auth
+from fastapi import Depends, HTTPException, Header
 
 # Initialize Firebase Admin SDK
 try:
@@ -58,8 +60,21 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user(user: UserInfo = Depends(verify_token)) -> UserInfo:
-    """
-    Get the current authenticated user.
-    """
-    return user
+# async def get_current_user(user: UserInfo = Depends(verify_token)) -> UserInfo:
+#     """
+#     Get the current authenticated user.
+#     """
+#     return user
+
+async def get_current_user(authorization: str = Header(...)) -> UserInfo:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid token header")
+    
+    token = authorization.split("Bearer ")[1]
+    try:
+        decoded_token = firebase_auth.verify_id_token(token)
+        uid = decoded_token["uid"]
+        return UserInfo(uid=uid)
+    except Exception as e:
+        print(f"[Auth] Token verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Token verification failed")

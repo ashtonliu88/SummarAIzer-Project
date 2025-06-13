@@ -1,5 +1,6 @@
 // src/services/api.ts
 import { auth } from '@/config/firebase-config';
+import { getAuth } from 'firebase/auth';
 
 const API_URL = 'http://localhost:8000';  // Replace with your actual API URL in production
 
@@ -28,13 +29,10 @@ export interface SummaryPreview {
 /**
  * Get the current user's ID token for authentication
  */
-const getToken = async (): Promise<string> => {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
-  
-  return user.getIdToken(true);
+export const getToken = async (): Promise<string | null> => {
+  const user = getAuth().currentUser;
+  if (!user) return null;
+  return await user.getIdToken();
 };
 
 /**
@@ -132,12 +130,17 @@ export const videoApi = {
   /**
    * Generate video from PDF with authentication (saves to user's Firebase storage)
    */
-  generateVideo: async (file: File) => {
+  generateVideo: async (file: File, userChosenName: string, audioName?: string) => {
     const token = await getToken();
+    console.log("Firebase token:", token);
     
     const formData = new FormData();
     formData.append('file', file);
-    
+    formData.append('custom_name', userChosenName);
+    if (audioName) {
+      formData.append("audio_name", audioName);
+    }
+
     const response = await fetch(`${API_URL}/generate-visuals-video-auth`, {
       method: 'POST',
       headers: {
@@ -145,12 +148,12 @@ export const videoApi = {
       },
       body: formData,
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
       throw new Error(errorData.message || `Video generation failed: ${response.status}`);
     }
-    
+
     return await response.json() as {
       video_url: string;
       video_name: string;

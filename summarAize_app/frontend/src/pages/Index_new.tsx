@@ -49,6 +49,7 @@ const Index: React.FC = () => {
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [chosenName, setChosenName] = useState('');
 
   const handleProcess = async () => {
     if (!selectedFile) {
@@ -137,7 +138,7 @@ const Index: React.FC = () => {
     toast("Generating visuals video...");
 
     try {
-      const videoResult = await videoApi.generateVideo(selectedFile);
+      const videoResult = await videoApi.generateVideo(selectedFile, chosenName);
       
       // Use Firebase URL if available, otherwise fallback to local URL
       const finalVideoUrl = videoResult.firebase_url || `${API}${videoResult.video_url}`;
@@ -231,6 +232,8 @@ const Index: React.FC = () => {
                 )}
               </>
             )}
+
+            
 
             {videoUrl && (
               <div className="bg-white border border-gray-200 rounded-lg p-6">

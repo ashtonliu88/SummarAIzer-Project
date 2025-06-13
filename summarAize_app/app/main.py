@@ -139,7 +139,11 @@ async def summarize_pdf_endpoint(
 
     
 @app.post("/generate-visuals-video")
-async def generate_visuals_video_endpoint(file: UploadFile = File(...)):
+async def generate_visuals_video_endpoint(
+    file: UploadFile = File(...),
+    audio_name: Optional[str] = Form(None)  # NEW
+):
+
     try:
         # Save uploaded PDF
         pdf_id = str(uuid.uuid4())
@@ -161,12 +165,24 @@ async def generate_visuals_video_endpoint(file: UploadFile = File(...)):
             print(f"[!] Error extracting visuals: {extract_error}")
             return JSONResponse(content={"error": f"Failed to extract visuals: {str(extract_error)}"}, status_code=500)
 
+        # Audio path
+        audio_path = Path(AUDIO_FOLDER) / audio_name if audio_name else None
+        if not audio_path or not audio_path.exists():
+            print(f"[!] No matching audio found at {audio_path}")
+            audio_path = None
+        else:
+            print(f"[✓] Using audio: {audio_path}")
+
         # Generate video
         video_filename = f"{pdf_id}_walkthrough.mp4"
         video_path = VIDEO_FOLDER / video_filename
 
         try:
-            generate_visuals_video(str(visuals_folder), str(video_path))
+            generate_visuals_video(
+                str(visuals_folder),
+                str(video_path),
+                voiceover_path=str(audio_path) if audio_path else None
+            )
         except Exception as video_error:
             print(f"[!] Error generating video: {video_error}")
             return JSONResponse(content={"error": f"Failed to generate video: {str(video_error)}"}, status_code=500)
@@ -181,6 +197,7 @@ async def generate_visuals_video_endpoint(file: UploadFile = File(...)):
     except Exception as e:
         print(f"[!] Error in /generate-visuals-video: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
     
 @app.get("/video/{filename}")
 async def get_video(filename: str):
@@ -472,8 +489,11 @@ async def save_to_library(
 @app.post("/generate-visuals-video-auth")
 async def generate_visuals_video_authenticated(
     file: UploadFile = File(...),
+    custom_name: Optional[str] = Form(None),
+    audio_name: Optional[str] = Form(None),  # NEW
     current_user: UserInfo = Depends(get_current_user)
 ):
+
     """
     Generate video from PDF visuals and save to user's Firebase storage with metadata
     """
@@ -536,12 +556,26 @@ async def generate_visuals_video_authenticated(
         print(f"[✓] Visual extraction completed in {extract_time:.2f}s")
 
         # Generate video
-        video_filename = f"{current_user.uid}_{pdf_id}_walkthrough.mp4"
+        safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', custom_name.strip()) if custom_name else f"{pdf_id}_walkthrough"
+        video_filename = f"{safe_name}.mp4"
         video_path = VIDEO_FOLDER / video_filename
 
         video_time = time.time()
+
+        # Check if there is a corresponding audio file
+        audio_path = Path(AUDIO_FOLDER) / audio_name if audio_name else None
+        if not audio_path or not audio_path.exists():
+            print(f"[!] No matching audio found at {audio_path}")
+            audio_path = None
+        else:
+            print(f"[✓] Using audio: {audio_path}")
+
         try:
-            generate_visuals_video(str(visuals_folder), str(video_path))
+            generate_visuals_video(
+                str(visuals_folder),
+                str(video_path),
+                voiceover_path=str(audio_path) if audio_path else None
+            )
         except Exception as video_error:
             print(f"[!] Error generating video: {video_error}")
             return JSONResponse(content={"error": f"Failed to generate video: {str(video_error)}"}, status_code=500)

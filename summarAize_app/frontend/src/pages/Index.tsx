@@ -12,6 +12,9 @@ import VideoPlayer from '@/components/VideoPlayer';
 import { toast } from '@/components/ui/sonner';
 import { videoApi } from '@/services/api';
 import { Volume2, Video } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+
 
 interface RelatedPaper {
   title: string;
@@ -49,6 +52,9 @@ const Index = () => {
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('beginner');
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [chosenName, setChosenName] = useState('');
+  const [audioName, setAudioName] = useState<string | null>(null);
+
 
   const handleProcess = async () => {
     if (!selectedFile) {
@@ -92,27 +98,6 @@ const Index = () => {
         };
     
         setSummaryData(summaryData);
-    
-        // Now generate video!
-        if (selectedFile) {
-          setIsGeneratingVideo(true);
-          toast("Generating visuals video...");
-          
-          try {
-            const videoResult = await videoApi.generateVideo(selectedFile);
-            
-            // Use Firebase URL if available, otherwise fallback to local URL
-            const finalVideoUrl = videoResult.firebase_url || `${API_BASE}${videoResult.video_url}`;
-            setVideoUrl(finalVideoUrl);
-            
-            toast.success(`Video Ready! Generated in ${videoResult.total_time.toFixed(1)}s`);
-          } catch (videoError) {
-            console.error("Video generation error:", videoError);
-            toast.error(`Video generation failed: ${videoError instanceof Error ? videoError.message : 'Unknown error'}`);
-          } finally {
-            setIsGeneratingVideo(false);
-          }
-        }
     
       } else {
         toast.error(`Error: ${data.error}`);
@@ -180,6 +165,60 @@ const Index = () => {
               {summaryData.relatedPapers && summaryData.relatedPapers.length > 0 && (
                 <RelatedPapers papers={summaryData.relatedPapers} />
               )}
+              
+              {/* Video Section */}
+              <div className="space-y-3">
+                {/* Name Input */}
+                <div className="space-y-2">
+                  <label htmlFor="videoName" className="block text-sm font-medium text-gray-700">
+                    Name your video
+                  </label>
+                  <input
+                    id="videoName"
+                    type="text"
+                    placeholder="Enter a name (optional)"
+                    value={chosenName}
+                    onChange={(e) => setChosenName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Generate Video Button */}
+                <div>
+                  <button
+                    className="w-full bg-[#2261CF] text-white font-semibold py-2 px-4 rounded-xl shadow-md hover:bg-[#1b4fa6] transition duration-150"
+                    disabled={!selectedFile || isGeneratingVideo}
+                    onClick={async () => {
+                      if (!selectedFile) {
+                        toast.error("Please select a file first.");
+                        return;
+                      }
+
+                      setIsGeneratingVideo(true);
+                      toast("Generating visuals video...");
+
+                      try {
+                        const videoResult = await videoApi.generateVideo(selectedFile, chosenName.trim(), audioName || undefined);
+                        const finalVideoUrl = videoResult.firebase_url || `${API_BASE}${videoResult.video_url}`;
+                        setVideoUrl(finalVideoUrl);
+                        toast.success(`Video Ready! Generated in ${videoResult.total_time.toFixed(1)}s`);
+                      } catch (videoError) {
+                        console.error("Video generation error:", videoError);
+                        toast.error(
+                          `Video generation failed: ${
+                            videoError instanceof Error ? videoError.message : 'Unknown error'
+                          }`
+                        );
+                      } finally {
+                        setIsGeneratingVideo(false);
+                      }
+                    }}
+                  >
+                    {isGeneratingVideo ? "Generating..." : "Generate Visual Summary Video"}
+                  </button>
+                </div>
+              </div>
+
 
               {/* Media Section with Header */}
               <section className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
@@ -199,7 +238,10 @@ const Index = () => {
                       <Volume2 className="w-5 h-5 text-purple-600" />
                       <h3 className="text-lg font-semibold text-gray-800">Audio Summary</h3>
                     </div>
-                    <TTSPlayer summary={summaryData.summary} />
+                    <TTSPlayer 
+                      summary={summaryData.summary}
+                      setAudioName={setAudioName}
+                    />
                   </div>
 
                   {/* Video Section */}
