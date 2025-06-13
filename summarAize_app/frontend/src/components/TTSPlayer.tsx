@@ -4,15 +4,17 @@ import { Download } from 'lucide-react';
 
 interface TTSPlayerProps {
   summary: string;
+  setAudioName?: (name: string) => void;
 }
 
 const API = import.meta.env.VITE_API_URL || "";  
 
-const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary }) => {
+const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary, setAudioName }) => {
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [hasError, setHasError] = useState<boolean>(false);
+
 
   useEffect(() => {
     const generateAudio = async () => {
@@ -39,7 +41,18 @@ const TTSPlayer: React.FC<TTSPlayerProps> = ({ summary }) => {
         
         if (response.ok && data.audio_url) {
           setAudioUrl(`${API}${data.audio_url}`);
+
+          // Extract filename from the URL (e.g., "/generated_audios/audio123.mp3" => "audio123.mp3")
+          const extractedName = data.audio_url.split('/').pop();
+          if (extractedName && setAudioName) {
+            setAudioName(extractedName);
+          }
+          
           toast.success("Audio Ready!");
+
+          if (setAudioName && data.audio_name) {
+            setAudioName(data.audio_name);
+          }
         } else if (response.status === 503 || data.fallback) {
           // Handle TTS service temporarily unavailable
           setError(data.message || "Text-to-speech service is temporarily unavailable");

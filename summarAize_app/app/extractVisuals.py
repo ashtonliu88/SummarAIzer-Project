@@ -7,7 +7,13 @@ from PIL import Image
 from moviepy.editor import *
 import moviepy.video.fx.all as vfx
 
-def generate_visuals_video(visuals_folder, output_video="visuals_walkthrough.mp4", duration_per_visual=3):
+
+def generate_visuals_video(
+    visuals_folder, 
+    output_video="visuals_walkthrough.mp4", 
+    duration_per_visual=3, 
+    voiceover_path=None  # <-- NEW
+):
     print(f"\n🎬 Generating video from visuals in: {visuals_folder}")
 
     # Get all extracted visuals (PNG)
@@ -22,19 +28,31 @@ def generate_visuals_video(visuals_folder, output_video="visuals_walkthrough.mp4
 
     for img_path in image_files:
         print(f"  → Adding {img_path}")
-
-        img_clip = ImageClip(img_path)
-        # img_clip = img_clip.resize(height=1080)  # Resize to HD height
-        img_clip = img_clip.set_duration(duration_per_visual)
+        img_clip = ImageClip(img_path).set_duration(duration_per_visual)
         img_clip = img_clip.fadein(0.5).fadeout(0.5)
-
         final_clips.append(img_clip)
 
-    # Concatenate
+    # Concatenate video
     final_video = concatenate_videoclips(final_clips, method="compose")
-    final_video.write_videofile(output_video, fps=24)
 
+    # Add voiceover if provided
+    if voiceover_path and os.path.exists(voiceover_path):
+        print(f"🎙 Adding voiceover: {voiceover_path}")
+        audio = AudioFileClip(voiceover_path)
+
+        # Loop visuals to match audio duration
+        if audio.duration > final_video.duration:
+            loops_required = int(audio.duration // final_video.duration) + 1
+            final_video = concatenate_videoclips([final_video] * loops_required).subclip(0, audio.duration)
+        else:
+            final_video = final_video.subclip(0, audio.duration)
+
+        final_video = final_video.set_audio(audio)
+
+
+    final_video.write_videofile(output_video, fps=24)
     print(f"\n✅ Video saved: {output_video}")
+
 
 def clean_caption_text(text):
     return re.sub(r'[^a-zA-Z0-9_]', '_', text.strip())[:50]
@@ -113,6 +131,7 @@ def extract_visual_elements(pdf_path, output_folder="extracted_visuals"):
 def main():
     parser = argparse.ArgumentParser(description="Extract figures, images, and tables from a PDF and generate a walkthrough video.")
     parser.add_argument("pdf_path", help="Path to the PDF file")
+    parser.add_argument("audio", help="Path to audio file")
     parser.add_argument("-o", "--output", default="extracted_visuals", help="Folder to save extracted visuals")
     parser.add_argument("-v", "--video", default="visuals_walkthrough.mp4", help="Filename for output video")
     args = parser.parse_args()
@@ -121,7 +140,7 @@ def main():
     extract_visual_elements(args.pdf_path, args.output)
 
     # Generate video
-    generate_visuals_video(args.output, args.video)
+    generate_visuals_video(visuals_folder=args.output, output_video=args.video, duration_per_visual=3, voiceover_path=args.audio)
 
 if __name__ == "__main__":
     main()
