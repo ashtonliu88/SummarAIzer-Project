@@ -12,6 +12,7 @@ from gtts import gTTS
 from textSummarize import PdfSummarizer
 from extractVisuals import extract_visual_elements, generate_visuals_video
 from imageExtract import extract_images
+from generatedImages import generate_images_from_captions
 from chatbot import SummaryRefiner
 import requests
 from auth import get_current_user, UserInfo
@@ -164,6 +165,8 @@ async def generate_visuals_video_endpoint(
         except Exception as extract_error:
             print(f"[!] Error extracting visuals: {extract_error}")
             return JSONResponse(content={"error": f"Failed to extract visuals: {str(extract_error)}"}, status_code=500)
+    
+        
 
         # Audio path
         audio_path = Path(AUDIO_FOLDER) / audio_name if audio_name else None
@@ -658,6 +661,41 @@ async def generate_visuals_video_authenticated(
     except Exception as e:
         total_time = time.time() - start_time
         print(f"[!] Error in /generate-visuals-video-auth: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.post("/generate-ai-images")
+async def generate_ai_images_endpoint(
+    captions_folder: str = Form(...),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """
+    Generate AI images from extracted captions/images using OpenAI API
+    """
+    try:
+        print(f"Generating images from folder: {captions_folder}")
+
+        # Create output folder
+        output_folder = Path("ai_generated_images") / str(uuid.uuid4())
+        output_folder.mkdir(parents=True, exist_ok=True)
+
+        # Call generation function
+        results = generate_images_from_captions(
+            captions_folder=captions_folder,
+            output_folder=str(output_folder)
+        )
+
+        print(f"AI Image generation complete. {len(results)} images generated.")
+
+        # Create static route if needed (optional)
+        app.mount("/ai_images", StaticFiles(directory=output_folder), name="ai_images")
+
+        return {
+            "generated_images": [f"/ai_images/{Path(f).name}" for f in results],
+            "image_count": len(results)
+        }
+
+    except Exception as e:
+        print(f"[!] Error in /generate-ai-images: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
